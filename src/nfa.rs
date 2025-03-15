@@ -5,6 +5,7 @@ use petgraph::dot::Dot;
 use std::fs::File;
 use std::io::Write;
 
+use crate::reg_ex::RegEx;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Symbol {
@@ -267,8 +268,9 @@ impl NFA {
     }
 }
 
-pub fn construct_nfa(reg_ex: &str) {
+pub fn construct_nfa(regex: &str, syntax_tree:RegEx) {
 
+    println!("The syntax tree is {:?}", syntax_tree);
     let a_nfa = NFA::literal('a');
     let b_nfa = NFA::literal('b');
 
