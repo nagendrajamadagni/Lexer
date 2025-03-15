@@ -118,38 +118,47 @@ impl NFA {
         return result;
     }
 
-    fn kleene_closure(nfa: &NFA) -> NFA {
-        let mut result = NFA::new();
-        let new_start = result.add_state();
-        let new_accept = result.add_state();
+    */
+    fn kleene_closure(nfa: NFA) -> NFA {
+        let mut result = NFA::new("");
+        let new_start = result.add_state(); // Add a new start and accept state
 
         // Copy states from the original NFA
 
         let offset = result.states.len();
 
-        for mut state in nfa.states.clone() {
+        for mut state in nfa.states {
             state.id += offset;
-            for targets in state.transitions.values_mut() {
-                for target in targets.iter_mut() {
-                    *target += offset;
+            let mut new_transitions = HashMap::new();
+
+            for (symbol, targets) in state.transitions {
+                let mut new_targets = HashSet::new();
+
+                for target in targets {
+                    new_targets.insert(target+offset);
                 }
+                new_transitions.insert(symbol, new_targets);
             }
+            state.transitions = new_transitions;
             result.states.push(state);
         }
 
         result.add_transition(new_start, Symbol::Epsilon, nfa.start_state + offset);
-        result.add_transition(new_start, Symbol::Epsilon, new_accept);
+        let new_accept = result.add_state();
+        result.add_transition(new_start, Symbol::Epsilon, new_accept); // Add epsilon transitions
+                                                                       // from new start to new
+                                                                       // accept state
 
-        for accept in nfa.accept_states.clone() {
-            result.add_transition(accept, Symbol::Epsilon, nfa.start_state + offset);
-            result.add_transition(accept, Symbol::Epsilon, new_accept);
+        for accept in nfa.accept_states { // Add epsilon transitions from old accept to new accept
+                                          // and old accept and old start
+            result.add_transition(accept + offset, Symbol::Epsilon, nfa.start_state + offset);
+            result.add_transition(accept + offset, Symbol::Epsilon, new_accept);
         }
 
-        result.start_state = new_start;
+        result.start_state = new_start; // Set new start and new accepts
         result.set_accept_state(new_accept);
         return result;
     }
-    */
 
    pub fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
        let mut result: NFA = NFA::new(&nfa1.regex);
@@ -251,8 +260,9 @@ pub fn construct_nfa(reg_ex: &str) {
     nnfa.start_state = start;
     nnfa.set_accept_state(end);
 
-    let result = NFA::concatenate(nfa, nnfa);
-    result.show_nfa("regex_ab");
+    //let result = NFA::concatenate(nfa, nnfa);
+    let result = NFA::kleene_closure(nfa);
+    result.show_nfa("regex_a*");
 
 
     //println!("Created a non finite automata for the string {}", nfa.regex);
