@@ -64,52 +64,64 @@ impl NFA {
         self.accept_states.insert(state_id);
     }
 
-        /*
 
-    fn union(nfa1: &NFA, nfa2: &NFA) -> NFA {
-        let mut result = NFA::new();
+    fn alternation(nfa1: NFA, nfa2: NFA) -> NFA {
+        let mut result = NFA::new("");
         let new_start = result.add_state();
-        let new_accept = result.add_state();
 
         // Copy states from NFA 1
-        let offset = result.states.len();
+        let offset1 = result.states.len();
 
-        for mut state in nfa1.states.clone() {
-            state.id += offset;
-            for targets in state.transitions.values_mut() {
-                for target in targets.iter_mut() {
-                    *target += offset;
+        for mut state in nfa1.states {
+            state.id += offset1;
+            let mut new_transitions = HashMap::new();
+
+            for (symbol, targets) in state.transitions {
+                let mut new_targets = HashSet::new();
+
+                for target in targets {
+                    new_targets.insert(target+offset1);
                 }
+                new_transitions.insert(symbol, new_targets);
             }
+            state.transitions = new_transitions;
             result.states.push(state);
         }
 
         // Add epsilon transition from new start to start state of NFA1
-        result.add_transition(new_start, Symbol::Epsilon, nfa1.start_state + offset);
+        result.add_transition(new_start, Symbol::Epsilon, nfa1.start_state + offset1);
+
+        let offset2 = result.states.len();
+
+        for mut state in nfa2.states { // Copy states from NFA2
+            state.id += offset2;
+            let mut new_transitions = HashMap::new();
+
+            for (symbol, targets) in state.transitions {
+                let mut new_targets = HashSet::new();
+
+                for target in targets {
+                    new_targets.insert(target+offset2);
+                }
+                new_transitions.insert(symbol, new_targets);
+            }
+            state.transitions = new_transitions;
+            result.states.push(state);
+        }
+
+        // Add epsilon transition from new start to start state of NFA2
+        result.add_transition(new_start, Symbol::Epsilon, nfa2.start_state + offset2);
         
+        let new_accept = result.add_state();
+
         // Add epsilon transitions from NFA1s accept states to new accept
-        for accept_state in nfa1.accept_states.clone() {
-            result.add_transition(accept_state + offset, Symbol::Epsilon, new_accept);
+        for accept_state in nfa1.accept_states {
+            result.add_transition(accept_state + offset1, Symbol::Epsilon, new_accept);
         }
         
-        let offset = result.states.len();
-
-        for mut state in nfa2.states.clone() {
-            state.id += offset;
-            for targets in state.transitions.values_mut() {
-                for target in targets.iter_mut() {
-                    *target += offset;
-                }
-            }
-            result.states.push(state);
-        }
-
-        // Add epsilon transition from new start to start state of NFA1
-        result.add_transition(new_start, Symbol::Epsilon, nfa2.start_state + offset);
-
         // Add epsilon transitions from NFA2s accept states to new accept
         for accept_state in nfa2.accept_states.clone() {
-            result.add_transition(accept_state + offset, Symbol::Epsilon, new_accept);
+            result.add_transition(accept_state + offset2, Symbol::Epsilon, new_accept);
         }
 
         result.start_state = new_start;
@@ -118,7 +130,6 @@ impl NFA {
         return result;
     }
 
-    */
     fn kleene_closure(nfa: NFA) -> NFA {
         let mut result = NFA::new("");
         let new_start = result.add_state(); // Add a new start and accept state
@@ -261,8 +272,9 @@ pub fn construct_nfa(reg_ex: &str) {
     nnfa.set_accept_state(end);
 
     //let result = NFA::concatenate(nfa, nnfa);
-    let result = NFA::kleene_closure(nfa);
-    result.show_nfa("regex_a*");
+    //let result = NFA::kleene_closure(nfa);
+    let result = NFA::alternation(nfa, nnfa);
+    result.show_nfa("regex_a|b");
 
 
     //println!("Created a non finite automata for the string {}", nfa.regex);
