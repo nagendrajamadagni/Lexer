@@ -272,14 +272,6 @@ pub fn construct_nfa(reg_ex: &str) {
     let a_nfa = NFA::literal('a');
     let b_nfa = NFA::literal('b');
 
-    //let result = NFA::concatenate(nfa, nnfa);
-    //let result = NFA::kleene_closure(nfa);
     let result = NFA::alternation(a_nfa, b_nfa);
     result.show_nfa("regex_a|b");
-
-
-    //println!("Created a non finite automata for the string {}", nfa.regex);
-
-    //nfa.show_nfa("regex_a");
-
 }
