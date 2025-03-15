@@ -171,7 +171,7 @@ impl NFA {
         return result;
     }
 
-   pub fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
+   fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
        let mut result: NFA = NFA::new(&nfa1.regex);
        result.states = nfa1.states.clone(); // Clone all states from nfa1
        let offset = nfa1.states.len();
@@ -208,8 +208,19 @@ impl NFA {
        return result;
    }
 
+   fn literal( character:char) -> NFA {
+       let mut result: NFA = NFA::new(&character.to_string());
+       let start_state = result.add_state();
+       let end_state = result.add_state();
+       result.add_transition(start_state, Symbol::Char(character), end_state);
 
-    pub fn show_nfa(&self, filename: &str) {
+       result.start_state = start_state;
+       result.set_accept_state(end_state);
+       return result;
+   }
+
+
+    fn show_nfa(&self, filename: &str) {
         let mut graph = DiGraph::new();
         let mut node_map = std::collections::HashMap::new();
 
@@ -258,22 +269,12 @@ impl NFA {
 
 pub fn construct_nfa(reg_ex: &str) {
 
-    let mut nfa = NFA::new(reg_ex);
-    let mut nnfa = NFA::new(reg_ex);
-    let new_start = nfa.add_state();
-    let new_end = nfa.add_state();
-    nfa.add_transition(new_start, Symbol::Char('a'), new_end);
-    let start = nnfa.add_state();
-    let end = nnfa.add_state();
-    nnfa.add_transition(start, Symbol::Char('b'), end);
-    nfa.start_state = new_start;
-    nfa.set_accept_state(new_end);
-    nnfa.start_state = start;
-    nnfa.set_accept_state(end);
+    let a_nfa = NFA::literal('a');
+    let b_nfa = NFA::literal('b');
 
     //let result = NFA::concatenate(nfa, nnfa);
     //let result = NFA::kleene_closure(nfa);
-    let result = NFA::alternation(nfa, nnfa);
+    let result = NFA::alternation(a_nfa, b_nfa);
     result.show_nfa("regex_a|b");
 
 
