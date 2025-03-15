@@ -5,7 +5,7 @@ use petgraph::dot::Dot;
 use std::fs::File;
 use std::io::Write;
 
-use crate::reg_ex::RegEx;
+use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 enum Symbol {
@@ -131,7 +131,7 @@ impl NFA {
         return result;
     }
 
-    fn kleene_closure(nfa: NFA) -> NFA {
+    fn closure(nfa: NFA, quantifier: Quantifier) -> NFA {
         let mut result = NFA::new("");
         let new_start = result.add_state(); // Add a new start and accept state
 
@@ -155,15 +155,29 @@ impl NFA {
             result.states.push(state);
         }
 
-        result.add_transition(new_start, Symbol::Epsilon, nfa.start_state + offset);
+        result.add_transition(new_start, Symbol::Epsilon, nfa.start_state + offset); // Add epsilon
+                                                                                     // transitions
+                                                                                     // from new
+                                                                                     // start to
+                                                                                     // old start
         let new_accept = result.add_state();
-        result.add_transition(new_start, Symbol::Epsilon, new_accept); // Add epsilon transitions
+        match quantifier {
+            Quantifier::Star | Quantifier::Question => {
+                    result.add_transition(new_start, Symbol::Epsilon, new_accept); // Add epsilon transitions
                                                                        // from new start to new
                                                                        // accept state
+                    }
+            Quantifier::Plus => {}
+        }
 
         for accept in nfa.accept_states { // Add epsilon transitions from old accept to new accept
                                           // and old accept and old start
+            match quantifier {
+                Quantifier::Star | Quantifier::Plus => {
             result.add_transition(accept + offset, Symbol::Epsilon, nfa.start_state + offset);
+            }
+                _ => {}
+            }
             result.add_transition(accept + offset, Symbol::Epsilon, new_accept);
         }
 
@@ -268,12 +282,62 @@ impl NFA {
     }
 }
 
+fn parse_base_tree(tree: Base) -> NFA {
+    match tree {
+        Base::Character(character) => NFA::literal(character),
+        Base::EscapeCharacter(character) => NFA::literal(character),
+        Base::Exp(regex) => {
+            let regex = *regex;
+            parse_regex_tree(regex)
+        }
+    }
+}
+
+fn parse_factor_tree(tree: Factor) -> NFA {
+    match tree {
+        Factor::SimpleFactor(base, quantifier) => {
+            let nfa = parse_base_tree(base);
+            match quantifier {
+                None => nfa,
+                Some(quantifier) => NFA::closure(nfa, quantifier)
+            }
+        }
+    }
+}
+
+fn parse_term_tree(tree: Term) -> NFA {
+    match tree {
+        Term::SimpleTerm(factor) => parse_factor_tree(factor),
+        Term::ConcatTerm(rfactor, lterm) => {
+            let lterm = *lterm;
+            let nfa1 = parse_term_tree(lterm);
+            let nfa2 = parse_factor_tree(rfactor);
+            NFA::concatenate(nfa1, nfa2)
+        }
+    }
+
+}
+
+fn parse_regex_tree(tree: RegEx) -> NFA {
+    match tree {
+        RegEx::SimpleRegex(term) => parse_term_tree(term),
+        RegEx::AlterRegex(lterm, rregex) => {
+            let rregex = *rregex; // Unboxing the value
+            let nfa1 = parse_term_tree(lterm);
+            let nfa2 = parse_regex_tree(rregex);
+            NFA::alternation(nfa1, nfa2)
+        }
+    }
+}
+
 pub fn construct_nfa(regex: &str, syntax_tree:RegEx) {
 
     println!("The syntax tree is {:?}", syntax_tree);
-    let a_nfa = NFA::literal('a');
-    let b_nfa = NFA::literal('b');
+    let nfa = parse_regex_tree(syntax_tree);
+    nfa.show_nfa(regex);
+    //let a_nfa = NFA::literal('a');
+    //let b_nfa = NFA::literal('b');
 
-    let result = NFA::alternation(a_nfa, b_nfa);
-    result.show_nfa("regex_a|b");
+    //let result = NFA::alternation(a_nfa, b_nfa);
+   // result.show_nfa("regex_a|b");
 }
