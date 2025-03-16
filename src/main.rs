@@ -3,8 +3,6 @@ use std::env;
 mod nfa;
 mod reg_ex;
 
-
-
 fn main() {
     let args: Vec<String> = env::args().collect();
 

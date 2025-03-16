@@ -5,14 +5,14 @@
 pub enum Quantifier {
     Star,
     Question,
-    Plus
+    Plus,
 }
 
 #[derive(Debug)]
 pub enum Base {
     Character(char),
     EscapeCharacter(char),
-    Exp(Box<RegEx>)
+    Exp(Box<RegEx>),
 }
 
 #[derive(Debug)]
@@ -23,17 +23,16 @@ pub enum Factor {
 #[derive(Debug)]
 pub enum Term {
     SimpleTerm(Factor),
-    ConcatTerm(Factor, Box<Term>)
+    ConcatTerm(Factor, Box<Term>),
 }
 
 #[derive(Debug)]
 pub enum RegEx {
     SimpleRegex(Term),
-    AlterRegex(Term, Box<RegEx>)
+    AlterRegex(Term, Box<RegEx>),
 }
 
 fn balanced_brackets(reg_ex: &str) -> bool {
-
     let mut stack = Vec::new();
 
     for ch in reg_ex.chars() {
@@ -52,25 +51,22 @@ fn balanced_brackets(reg_ex: &str) -> bool {
     stack.is_empty()
 }
 
-fn parse_base(regex: &str, start:usize) -> (Base, usize) {
+fn parse_base(regex: &str, start: usize) -> (Base, usize) {
     let nchar = regex.chars().nth(start).unwrap();
     if nchar == '(' {
         let (inner_regex, new_start) = parse_regex(regex, start + 1);
         let new_base = Base::Exp(Box::new(inner_regex));
         let new_start = new_start + 1; // Consume the rparen
         (new_base, new_start)
-    }
-    else if nchar == '\\' {
+    } else if nchar == '\\' {
         let new_base = Base::EscapeCharacter(regex.chars().nth(start + 1).unwrap());
         let new_start = start + 2;
         (new_base, new_start)
-    }
-    else {
+    } else {
         let new_base = Base::Character(nchar);
         let new_start = start + 1;
         (new_base, new_start)
     }
-
 }
 
 fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
@@ -80,20 +76,16 @@ fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
     let quantifier = {
         if new_start >= regex.len() {
             None
-        }
-        else if regex.chars().nth(new_start).unwrap() == '*' {
+        } else if regex.chars().nth(new_start).unwrap() == '*' {
             new_start += 1;
             Some(Quantifier::Star)
-        }
-        else if regex.chars().nth(new_start).unwrap() == '?' {
+        } else if regex.chars().nth(new_start).unwrap() == '?' {
             new_start += 1;
-            Some (Quantifier::Question)
-        }
-        else if regex.chars().nth(new_start).unwrap() == '+' {
+            Some(Quantifier::Question)
+        } else if regex.chars().nth(new_start).unwrap() == '+' {
             new_start += 1;
-            Some (Quantifier::Plus)
-        }
-        else {
+            Some(Quantifier::Plus)
+        } else {
             None
         }
     };
@@ -103,16 +95,14 @@ fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
 
 fn parse_term(regex: &str, start: usize) -> (Term, usize) {
     let (factor, mut new_start) = parse_factor(regex, start);
-    
-    let mut prev_term = Term::SimpleTerm(factor);
 
+    let mut prev_term = Term::SimpleTerm(factor);
 
     while new_start < regex.len() {
         let nchar = regex.chars().nth(new_start).unwrap();
         if nchar == '|' || nchar == ')' {
             break;
-        }
-        else {
+        } else {
             let (next_factor, tmp_start) = parse_factor(regex, new_start);
             let next_term = Term::ConcatTerm(next_factor, Box::new(prev_term));
             prev_term = next_term;
@@ -120,23 +110,18 @@ fn parse_term(regex: &str, start: usize) -> (Term, usize) {
         }
     }
     (prev_term, new_start)
-
 }
 
 fn parse_regex(regex: &str, start: usize) -> (RegEx, usize) {
-
     let (term, new_start) = parse_term(regex, start);
     if new_start >= regex.len() {
         return (RegEx::SimpleRegex(term), new_start);
-    }
-    else if regex.chars().nth(new_start).unwrap() == '|' {
+    } else if regex.chars().nth(new_start).unwrap() == '|' {
         let (next_regex, new_start) = parse_regex(regex, new_start + 1);
         return (RegEx::AlterRegex(term, Box::new(next_regex)), new_start);
-    }
-    else {
+    } else {
         return (RegEx::SimpleRegex(term), new_start);
     }
-
 }
 
 pub fn build_syntax_tree(regex: &str) -> RegEx {

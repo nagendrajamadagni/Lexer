@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
-use std::process::Command;
-use petgraph::graph::DiGraph;
 use petgraph::dot::Dot;
+use petgraph::graph::DiGraph;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
+use std::process::Command;
 
 use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
 
@@ -15,7 +15,7 @@ enum Symbol {
 
 #[derive(Debug, Clone)]
 struct State {
-    id:usize,
+    id: usize,
     transitions: HashMap<Symbol, HashSet<usize>>, // Store by reference is not a thing in Rust
 }
 
@@ -24,18 +24,18 @@ struct NFA {
     states: Vec<State>,
     start_state: usize,
     accept_states: HashSet<usize>,
-    alphabet: HashSet<char>
+    alphabet: HashSet<char>,
 }
 
 impl State {
     fn new(id: usize) -> Self {
         State {
             id,
-            transitions: HashMap::new()
+            transitions: HashMap::new(),
         }
     }
 
-    fn add_transition(&mut self, symbol:Symbol, to: usize) {
+    fn add_transition(&mut self, symbol: Symbol, to: usize) {
         self.transitions.entry(symbol).or_default().insert(to);
     }
 }
@@ -46,7 +46,7 @@ impl NFA {
             states: Vec::new(),
             start_state: 0,
             accept_states: HashSet::new(),
-            alphabet: HashSet::new()
+            alphabet: HashSet::new(),
         }
     }
 
@@ -57,14 +57,13 @@ impl NFA {
         return state_id;
     }
 
-    fn add_transition(&mut self, from: usize, symbol:Symbol, to: usize) {
+    fn add_transition(&mut self, from: usize, symbol: Symbol, to: usize) {
         self.states[from].add_transition(symbol, to);
     }
 
     fn set_accept_state(&mut self, state_id: usize) {
         self.accept_states.insert(state_id);
     }
-
 
     fn alternation(nfa1: NFA, nfa2: NFA) -> NFA {
         let mut result = NFA::new();
@@ -81,7 +80,7 @@ impl NFA {
                 let mut new_targets = HashSet::new();
 
                 for target in targets {
-                    new_targets.insert(target+offset1);
+                    new_targets.insert(target + offset1);
                 }
                 new_transitions.insert(symbol, new_targets);
             }
@@ -94,7 +93,8 @@ impl NFA {
 
         let offset2 = result.states.len();
 
-        for mut state in nfa2.states { // Copy states from NFA2
+        for mut state in nfa2.states {
+            // Copy states from NFA2
             state.id += offset2;
             let mut new_transitions = HashMap::new();
 
@@ -102,7 +102,7 @@ impl NFA {
                 let mut new_targets = HashSet::new();
 
                 for target in targets {
-                    new_targets.insert(target+offset2);
+                    new_targets.insert(target + offset2);
                 }
                 new_transitions.insert(symbol, new_targets);
             }
@@ -112,14 +112,14 @@ impl NFA {
 
         // Add epsilon transition from new start to start state of NFA2
         result.add_transition(new_start, Symbol::Epsilon, nfa2.start_state + offset2);
-        
+
         let new_accept = result.add_state();
 
         // Add epsilon transitions from NFA1s accept states to new accept
         for accept_state in nfa1.accept_states {
             result.add_transition(accept_state + offset1, Symbol::Epsilon, new_accept);
         }
-        
+
         // Add epsilon transitions from NFA2s accept states to new accept
         for accept_state in nfa2.accept_states.clone() {
             result.add_transition(accept_state + offset2, Symbol::Epsilon, new_accept);
@@ -148,7 +148,7 @@ impl NFA {
                 let mut new_targets = HashSet::new();
 
                 for target in targets {
-                    new_targets.insert(target+offset);
+                    new_targets.insert(target + offset);
                 }
                 new_transitions.insert(symbol, new_targets);
             }
@@ -164,19 +164,24 @@ impl NFA {
         let new_accept = result.add_state();
         match quantifier {
             Quantifier::Star | Quantifier::Question => {
-                    result.add_transition(new_start, Symbol::Epsilon, new_accept); // Add epsilon transitions
-                                                                       // from new start to new
-                                                                       // accept state
-                    }
+                result.add_transition(new_start, Symbol::Epsilon, new_accept); // Add epsilon transitions
+                                                                               // from new start to new
+                                                                               // accept state
+            }
             Quantifier::Plus => {}
         }
 
-        for accept in nfa.accept_states { // Add epsilon transitions from old accept to new accept
-                                          // and old accept and old start
+        for accept in nfa.accept_states {
+            // Add epsilon transitions from old accept to new accept
+            // and old accept and old start
             match quantifier {
                 Quantifier::Star | Quantifier::Plus => {
-            result.add_transition(accept + offset, Symbol::Epsilon, nfa.start_state + offset);
-            }
+                    result.add_transition(
+                        accept + offset,
+                        Symbol::Epsilon,
+                        nfa.start_state + offset,
+                    );
+                }
                 _ => {}
             }
             result.add_transition(accept + offset, Symbol::Epsilon, new_accept);
@@ -187,56 +192,54 @@ impl NFA {
         return result;
     }
 
-   fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
-       let mut result: NFA = NFA::new();
-       result.states = nfa1.states.clone(); // Clone all states from nfa1
-       let offset = nfa1.states.len();
-        
-       // Add states and their transitions from nfa2 into the resultant nfa
-       for mut state in nfa2.states { // For each state in NFA2
+    fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
+        let mut result: NFA = NFA::new();
+        result.states = nfa1.states.clone(); // Clone all states from nfa1
+        let offset = nfa1.states.len();
+
+        // Add states and their transitions from nfa2 into the resultant nfa
+        for mut state in nfa2.states {
+            // For each state in NFA2
             state.id += offset; // Change their ID by offset
             let mut new_transitions = HashMap::new(); // Create new transitions
 
             for (symbol, targets) in state.transitions {
                 let mut new_targets = HashSet::new();
-            
+
                 for target in targets {
-                    new_targets.insert(target+offset);
+                    new_targets.insert(target + offset);
                 }
                 new_transitions.insert(symbol, new_targets);
             }
             state.transitions = new_transitions; // Add the new transitions to new states
             result.states.push(state); // Add the new states to the results
-       }
+        }
 
-       // Add epsilon transitions from each acceptor state of NFA1 to start state of NFA2
-        
-       for accept_id in nfa1.accept_states {
-           result.add_transition(accept_id, Symbol::Epsilon, nfa2.start_state + offset);
-       }
+        // Add epsilon transitions from each acceptor state of NFA1 to start state of NFA2
 
-       result.start_state = nfa1.start_state; // Make the start state of NFA1 the start state of
-                                              // the result
-       result.accept_states = nfa2.accept_states.into_iter()
-                                                .map(|s| s + offset)
-                                                .collect(); // Make the accept states of NFA2 the accept
-                                                  // states of the result
-       result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
-       return result;
-   }
+        for accept_id in nfa1.accept_states {
+            result.add_transition(accept_id, Symbol::Epsilon, nfa2.start_state + offset);
+        }
 
-   fn literal( character:char) -> NFA {
-       let mut result: NFA = NFA::new();
-       let start_state = result.add_state();
-       let end_state = result.add_state();
-       result.alphabet.insert(character);
-       result.add_transition(start_state, Symbol::Char(character), end_state);
+        result.start_state = nfa1.start_state; // Make the start state of NFA1 the start state of
+                                               // the result
+        result.accept_states = nfa2.accept_states.into_iter().map(|s| s + offset).collect(); // Make the accept states of NFA2 the accept
+                                                                                             // states of the result
+        result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
+        return result;
+    }
 
-       result.start_state = start_state;
-       result.set_accept_state(end_state);
-       return result;
-   }
+    fn literal(character: char) -> NFA {
+        let mut result: NFA = NFA::new();
+        let start_state = result.add_state();
+        let end_state = result.add_state();
+        result.alphabet.insert(character);
+        result.add_transition(start_state, Symbol::Char(character), end_state);
 
+        result.start_state = start_state;
+        result.set_accept_state(end_state);
+        return result;
+    }
 
     fn show_nfa(&self, filename: &str) {
         let mut graph = DiGraph::new();
@@ -253,8 +256,8 @@ impl NFA {
             for (symbol, targets) in &state.transitions {
                 for target in targets {
                     let symbol_str = match symbol {
-                       Symbol::Char(c) => c.to_string(),
-                       Symbol::Epsilon => "𝛆".to_string()
+                        Symbol::Char(c) => c.to_string(),
+                        Symbol::Epsilon => "𝛆".to_string(),
                     };
                     graph.add_edge(node_map[&state.id], node_map[&target], symbol_str);
                 }
@@ -274,12 +277,17 @@ impl NFA {
         let dot = Dot::new(&graph);
 
         // Write dot to file
-        let dot_filename = format!("{}.dot", filename); 
+        let dot_filename = format!("{}.dot", filename);
         let mut dot_file = File::create(&dot_filename).expect("Failed to create dot file");
 
-        dot_file.write_all(dot.to_string().as_bytes()).expect("Failed to write dot file");
+        dot_file
+            .write_all(dot.to_string().as_bytes())
+            .expect("Failed to write dot file");
 
-        Command::new("dot").args(&["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)]).output().expect("Failed to execute Graphviz");
+        Command::new("dot")
+            .args(&["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)])
+            .output()
+            .expect("Failed to execute Graphviz");
 
         println!("NFA vizualization saved as {}.jpg", filename);
     }
@@ -302,7 +310,7 @@ fn parse_factor_tree(tree: Factor) -> NFA {
             let nfa = parse_base_tree(base);
             match quantifier {
                 None => nfa,
-                Some(quantifier) => NFA::closure(nfa, quantifier)
+                Some(quantifier) => NFA::closure(nfa, quantifier),
             }
         }
     }
@@ -318,7 +326,6 @@ fn parse_term_tree(tree: Term) -> NFA {
             NFA::concatenate(nfa1, nfa2)
         }
     }
-
 }
 
 fn parse_regex_tree(tree: RegEx) -> NFA {
@@ -333,7 +340,7 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
     }
 }
 
-pub fn construct_nfa(regex: &str, syntax_tree:RegEx) {
+pub fn construct_nfa(regex: &str, syntax_tree: RegEx) {
     let nfa = parse_regex_tree(syntax_tree);
     nfa.show_nfa(regex);
 }
