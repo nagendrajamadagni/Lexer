@@ -24,7 +24,7 @@ struct NFA {
     states: Vec<State>,
     start_state: usize,
     accept_states: HashSet<usize>,
-    regex: String
+    alphabet: HashSet<char>
 }
 
 impl State {
@@ -41,12 +41,12 @@ impl State {
 }
 
 impl NFA {
-    fn new(reg_ex: &str) -> Self {
+    fn new() -> Self {
         NFA {
             states: Vec::new(),
             start_state: 0,
             accept_states: HashSet::new(),
-            regex: reg_ex.to_string()
+            alphabet: HashSet::new()
         }
     }
 
@@ -67,7 +67,7 @@ impl NFA {
 
 
     fn alternation(nfa1: NFA, nfa2: NFA) -> NFA {
-        let mut result = NFA::new("");
+        let mut result = NFA::new();
         let new_start = result.add_state();
 
         // Copy states from NFA 1
@@ -127,12 +127,13 @@ impl NFA {
 
         result.start_state = new_start;
         result.set_accept_state(new_accept);
+        result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
 
         return result;
     }
 
     fn closure(nfa: NFA, quantifier: Quantifier) -> NFA {
-        let mut result = NFA::new("");
+        let mut result = NFA::new();
         let new_start = result.add_state(); // Add a new start and accept state
 
         // Copy states from the original NFA
@@ -187,7 +188,7 @@ impl NFA {
     }
 
    fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
-       let mut result: NFA = NFA::new(&nfa1.regex);
+       let mut result: NFA = NFA::new();
        result.states = nfa1.states.clone(); // Clone all states from nfa1
        let offset = nfa1.states.len();
         
@@ -220,13 +221,15 @@ impl NFA {
                                                 .map(|s| s + offset)
                                                 .collect(); // Make the accept states of NFA2 the accept
                                                   // states of the result
+       result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
        return result;
    }
 
    fn literal( character:char) -> NFA {
-       let mut result: NFA = NFA::new(&character.to_string());
+       let mut result: NFA = NFA::new();
        let start_state = result.add_state();
        let end_state = result.add_state();
+       result.alphabet.insert(character);
        result.add_transition(start_state, Symbol::Char(character), end_state);
 
        result.start_state = start_state;
@@ -331,13 +334,6 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
 }
 
 pub fn construct_nfa(regex: &str, syntax_tree:RegEx) {
-
-    println!("The syntax tree is {:?}", syntax_tree);
     let nfa = parse_regex_tree(syntax_tree);
     nfa.show_nfa(regex);
-    //let a_nfa = NFA::literal('a');
-    //let b_nfa = NFA::literal('b');
-
-    //let result = NFA::alternation(a_nfa, b_nfa);
-   // result.show_nfa("regex_a|b");
 }

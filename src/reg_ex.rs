@@ -53,8 +53,7 @@ fn balanced_brackets(reg_ex: &str) -> bool {
 }
 
 fn parse_base(regex: &str, start:usize) -> (Base, usize) {
-    let mut chars = regex.chars(); // (a(b|c))* start = 0
-    let nchar = chars.nth(start).unwrap();
+    let nchar = regex.chars().nth(start).unwrap();
     if nchar == '(' {
         let (inner_regex, new_start) = parse_regex(regex, start + 1);
         let new_base = Base::Exp(Box::new(inner_regex));
@@ -62,22 +61,22 @@ fn parse_base(regex: &str, start:usize) -> (Base, usize) {
         (new_base, new_start)
     }
     else if nchar == '\\' {
-        let new_base = Base::EscapeCharacter(chars.nth(start + 1).unwrap());
+        let new_base = Base::EscapeCharacter(regex.chars().nth(start + 1).unwrap());
         let new_start = start + 2;
         (new_base, new_start)
     }
     else {
         let new_base = Base::Character(nchar);
-        let new_start = start + 1; // Parsed a, b, c
+        let new_start = start + 1;
         (new_base, new_start)
     }
 
 }
 
 fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
-    let (base, new_start) = parse_base(regex, start); // (a(b|c))* start = 0
+    let (base, new_start) = parse_base(regex, start);
 
-    let mut new_start = new_start; // new_start = 7
+    let mut new_start = new_start;
     let quantifier = {
         if new_start >= regex.len() {
             None
@@ -103,7 +102,7 @@ fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
 }
 
 fn parse_term(regex: &str, start: usize) -> (Term, usize) {
-    let (factor, mut new_start) = parse_factor(regex, start); // (a(b|c))* start = 0
+    let (factor, mut new_start) = parse_factor(regex, start);
     
     let mut prev_term = Term::SimpleTerm(factor);
 
@@ -135,7 +134,6 @@ fn parse_regex(regex: &str, start: usize) -> (RegEx, usize) {
         return (RegEx::AlterRegex(term, Box::new(next_regex)), new_start);
     }
     else {
-        //panic!("Invalid regex provided!");
         return (RegEx::SimpleRegex(term), new_start);
     }
 
