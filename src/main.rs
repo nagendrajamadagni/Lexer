@@ -1,5 +1,6 @@
 use std::env;
 
+mod fa;
 mod nfa;
 mod reg_ex;
 

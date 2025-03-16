@@ -5,38 +5,103 @@ use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 
+use crate::fa::{FAState, Symbol, FA};
 use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-enum Symbol {
-    Epsilon,
-    Char(char),
-}
-
 #[derive(Debug, Clone)]
-struct State {
+struct NFAState {
     id: usize,
     transitions: HashMap<Symbol, HashSet<usize>>, // Store by reference is not a thing in Rust
 }
 
 #[derive(Debug)]
 struct NFA {
-    states: Vec<State>,
+    states: Vec<NFAState>,
     start_state: usize,
     accept_states: HashSet<usize>,
     alphabet: HashSet<char>,
 }
 
-impl State {
+impl FA for NFA {
+    fn show_fa(&self, filename: &str) {
+        let mut graph = DiGraph::new();
+        let mut node_map = std::collections::HashMap::new();
+
+        // Add nodes
+        for state in &self.states {
+            let node = graph.add_node(format!("State {}", state.id));
+            node_map.insert(state.id, node);
+        }
+
+        // Add edges
+        for state in &self.states {
+            for (symbol, targets) in &state.transitions {
+                for target in targets {
+                    let symbol_str = match symbol {
+                        Symbol::Char(c) => c.to_string(),
+                        Symbol::Epsilon => "𝛆".to_string(),
+                    };
+                    graph.add_edge(node_map[&state.id], node_map[&target], symbol_str);
+                }
+            }
+        }
+
+        // Mark Start and Accept States
+
+        let start_node = node_map[&self.start_state];
+        graph[start_node] = format!("Start\nState {}", self.start_state);
+
+        for accept in &self.accept_states {
+            let accept_node = node_map[&accept];
+            graph[accept_node] = format!("Accept\nState {}", accept);
+        }
+
+        let dot = Dot::new(&graph);
+
+        // Write dot to file
+        let dot_filename = format!("{}.dot", filename);
+        let mut dot_file = File::create(&dot_filename).expect("Failed to create dot file");
+
+        dot_file
+            .write_all(dot.to_string().as_bytes())
+            .expect("Failed to write dot file");
+
+        Command::new("dot")
+            .args(&["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)])
+            .output()
+            .expect("Failed to execute Graphviz");
+
+        println!("FA vizualization saved as {}.jpg", filename);
+    }
+
+    fn add_transition(&mut self, from: usize, symbol: Symbol, to: usize) {
+        self.states[from].add_transition(symbol, to);
+    }
+
+    fn set_accept_state(&mut self, state_id: usize) {
+        self.accept_states.insert(state_id);
+    }
+
+    fn add_state(&mut self) -> usize {
+        let state_id = self.states.len();
+        let new_state: NFAState = NFAState::new(state_id);
+        self.states.push(new_state.clone());
+        return state_id;
+    }
+}
+
+impl FAState for NFAState {
+    fn add_transition(&mut self, symbol: Symbol, to: usize) {
+        self.transitions.entry(symbol).or_default().insert(to);
+    }
+}
+
+impl NFAState {
     fn new(id: usize) -> Self {
-        State {
+        NFAState {
             id,
             transitions: HashMap::new(),
         }
-    }
-
-    fn add_transition(&mut self, symbol: Symbol, to: usize) {
-        self.transitions.entry(symbol).or_default().insert(to);
     }
 }
 
@@ -48,21 +113,6 @@ impl NFA {
             accept_states: HashSet::new(),
             alphabet: HashSet::new(),
         }
-    }
-
-    fn add_state(&mut self) -> usize {
-        let state_id = self.states.len();
-        let new_state: State = State::new(state_id);
-        self.states.push(new_state.clone());
-        return state_id;
-    }
-
-    fn add_transition(&mut self, from: usize, symbol: Symbol, to: usize) {
-        self.states[from].add_transition(symbol, to);
-    }
-
-    fn set_accept_state(&mut self, state_id: usize) {
-        self.accept_states.insert(state_id);
     }
 
     fn alternation(nfa1: NFA, nfa2: NFA) -> NFA {
@@ -229,7 +279,7 @@ impl NFA {
         return result;
     }
 
-    fn literal(character: char) -> NFA {
+    fn literal_construction(character: char) -> NFA {
         let mut result: NFA = NFA::new();
         let start_state = result.add_state();
         let end_state = result.add_state();
@@ -240,63 +290,12 @@ impl NFA {
         result.set_accept_state(end_state);
         return result;
     }
-
-    fn show_nfa(&self, filename: &str) {
-        let mut graph = DiGraph::new();
-        let mut node_map = std::collections::HashMap::new();
-
-        // Add nodes
-        for state in &self.states {
-            let node = graph.add_node(format!("State {}", state.id));
-            node_map.insert(state.id, node);
-        }
-
-        // Add edges
-        for state in &self.states {
-            for (symbol, targets) in &state.transitions {
-                for target in targets {
-                    let symbol_str = match symbol {
-                        Symbol::Char(c) => c.to_string(),
-                        Symbol::Epsilon => "𝛆".to_string(),
-                    };
-                    graph.add_edge(node_map[&state.id], node_map[&target], symbol_str);
-                }
-            }
-        }
-
-        // Mark Start and Accept States
-
-        let start_node = node_map[&self.start_state];
-        graph[start_node] = format!("Start\nState {}", self.start_state);
-
-        for accept in &self.accept_states {
-            let accept_node = node_map[&accept];
-            graph[accept_node] = format!("Accept\nState {}", accept);
-        }
-
-        let dot = Dot::new(&graph);
-
-        // Write dot to file
-        let dot_filename = format!("{}.dot", filename);
-        let mut dot_file = File::create(&dot_filename).expect("Failed to create dot file");
-
-        dot_file
-            .write_all(dot.to_string().as_bytes())
-            .expect("Failed to write dot file");
-
-        Command::new("dot")
-            .args(&["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)])
-            .output()
-            .expect("Failed to execute Graphviz");
-
-        println!("NFA vizualization saved as {}.jpg", filename);
-    }
 }
 
 fn parse_base_tree(tree: Base) -> NFA {
     match tree {
-        Base::Character(character) => NFA::literal(character),
-        Base::EscapeCharacter(character) => NFA::literal(character),
+        Base::Character(character) => NFA::literal_construction(character),
+        Base::EscapeCharacter(character) => NFA::literal_construction(character),
         Base::Exp(regex) => {
             let regex = *regex;
             parse_regex_tree(regex)
@@ -342,5 +341,5 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
 
 pub fn construct_nfa(regex: &str, syntax_tree: RegEx) {
     let nfa = parse_regex_tree(syntax_tree);
-    nfa.show_nfa(regex);
+    nfa.show_fa(regex);
 }
