@@ -51,8 +51,19 @@ fn balanced_brackets(reg_ex: &str) -> bool {
     stack.is_empty()
 }
 
+fn nchar_is_valid(nchar: char) -> bool {
+    match nchar {
+        '*' | '|' | '?' | ')' => false,
+        _ => true,
+    }
+}
+
 fn parse_base(regex: &str, start: usize) -> (Base, usize) {
-    let nchar = regex.chars().nth(start).unwrap();
+    let nchar = regex.chars().nth(start);
+    let nchar = match nchar {
+        None => panic!("Invalid regex provided"),
+        Some(nchar) => nchar,
+    };
     if nchar == '(' {
         let (inner_regex, new_start) = parse_regex(regex, start + 1);
         let new_base = Base::Exp(Box::new(inner_regex));
@@ -62,10 +73,12 @@ fn parse_base(regex: &str, start: usize) -> (Base, usize) {
         let new_base = Base::EscapeCharacter(regex.chars().nth(start + 1).unwrap());
         let new_start = start + 2;
         (new_base, new_start)
-    } else {
+    } else if nchar_is_valid(nchar) {
         let new_base = Base::Character(nchar);
         let new_start = start + 1;
         (new_base, new_start)
+    } else {
+        panic!("Invalid regex provided!");
     }
 }
 
@@ -136,5 +149,6 @@ pub fn build_syntax_tree(regex: &str) -> RegEx {
     }
 
     let (syntax_tree, _) = parse_regex(regex, 0);
+    println!("The syntax tree generated is {:?}", syntax_tree);
     return syntax_tree;
 }
