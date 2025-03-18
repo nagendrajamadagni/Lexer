@@ -6,3 +6,9 @@ edition = "2021"
 [dependencies]
 petgraph = "0.6"
 dot = "0.1"
+
+[profile.release]
+debug = true  # Enables DWARF debug info for Valgrind
+
+[features]
+profiling = []
