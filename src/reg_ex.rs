@@ -138,8 +138,6 @@ fn parse_regex(regex: &str, start: usize) -> (RegEx, usize) {
 }
 
 pub fn build_syntax_tree(regex: &str) -> RegEx {
-    println!("Attempting to build syntax tree for {regex}");
-
     if !balanced_brackets(regex) {
         panic!("The provided regular expression has unbalanced parentheses");
     }
@@ -149,6 +147,5 @@ pub fn build_syntax_tree(regex: &str) -> RegEx {
     }
 
     let (syntax_tree, _) = parse_regex(regex, 0);
-    println!("The syntax tree generated is {:?}", syntax_tree);
     return syntax_tree;
 }
