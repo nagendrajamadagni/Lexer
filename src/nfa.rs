@@ -2,24 +2,32 @@ use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
 
 use crate::fa::{FAState, Symbol, FA};
 use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
 
-#[derive(Debug, Clone)]
-struct NFAState {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct NFAState {
     id: usize,
     transitions: HashMap<Symbol, HashSet<usize>>, // Store by reference is not a thing in Rust
 }
 
 #[derive(Debug)]
-struct NFA {
+pub struct NFA {
     states: Vec<NFAState>,
     start_state: usize,
     accept_states: HashSet<usize>,
     alphabet: HashSet<char>,
+    regex: String,
+}
+
+impl Hash for NFAState {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }
 
 impl FA for NFA {
@@ -71,7 +79,7 @@ impl FA for NFA {
             .output()
             .expect("Failed to execute Graphviz");
 
-        println!("FA vizualization saved as {}.jpg", filename);
+        println!("NFA vizualization saved as {filename}.jpg");
     }
 
     fn add_transition(&mut self, from: usize, symbol: Symbol, to: usize) {
@@ -103,6 +111,14 @@ impl NFAState {
             transitions: HashMap::new(),
         }
     }
+
+    pub fn get_transitions(&self) -> HashMap<Symbol, HashSet<usize>> {
+        self.transitions.clone()
+    }
+
+    pub fn get_id(&self) -> usize {
+        return self.id;
+    }
 }
 
 impl NFA {
@@ -112,6 +128,7 @@ impl NFA {
             start_state: 0,
             accept_states: HashSet::new(),
             alphabet: HashSet::new(),
+            regex: "".to_string(),
         }
     }
 
@@ -239,6 +256,7 @@ impl NFA {
 
         result.start_state = new_start; // Set new start and new accepts
         result.set_accept_state(new_accept);
+        result.alphabet = nfa.alphabet.clone();
         return result;
     }
 
@@ -290,6 +308,30 @@ impl NFA {
         result.set_accept_state(end_state);
         return result;
     }
+
+    pub fn get_start_state(&self) -> usize {
+        self.start_state
+    }
+
+    pub fn get_state(&self, id: usize) -> NFAState {
+        let state = self.states.get(id);
+        match state {
+            Some(state) => state.clone(),
+            None => panic!("Invalid state index provided"),
+        }
+    }
+
+    pub fn get_alphabet(&self) -> HashSet<char> {
+        return self.alphabet.clone();
+    }
+
+    pub fn get_acceptor_states(&self) -> HashSet<usize> {
+        return self.accept_states.clone();
+    }
+
+    pub fn get_regex(&self) -> String {
+        return self.regex.clone();
+    }
 }
 
 fn parse_base_tree(tree: Base) -> NFA {
@@ -339,7 +381,10 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
     }
 }
 
-pub fn construct_nfa(regex: &str, syntax_tree: RegEx) {
-    let nfa = parse_regex_tree(syntax_tree);
-    nfa.show_fa(regex);
+pub fn construct_nfa(regex: &str, syntax_tree: RegEx) -> NFA {
+    let mut nfa = parse_regex_tree(syntax_tree);
+    nfa.regex = regex.to_string();
+    let filename = format!("{regex}_nfa");
+    nfa.show_fa(&filename);
+    nfa
 }
