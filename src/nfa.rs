@@ -93,7 +93,7 @@ impl FA for NFA {
     fn add_state(&mut self) -> usize {
         let state_id = self.states.len();
         let new_state: NFAState = NFAState::new(state_id);
-        self.states.push(new_state.clone());
+        self.states.push(new_state);
         return state_id;
     }
 }
@@ -112,8 +112,8 @@ impl NFAState {
         }
     }
 
-    pub fn get_transitions(&self) -> HashMap<Symbol, HashSet<usize>> {
-        self.transitions.clone()
+    pub fn get_transitions(&self) -> &HashMap<Symbol, HashSet<usize>> {
+        &self.transitions
     }
 
     pub fn get_id(&self) -> usize {
@@ -188,7 +188,7 @@ impl NFA {
         }
 
         // Add epsilon transitions from NFA2s accept states to new accept
-        for accept_state in nfa2.accept_states.clone() {
+        for accept_state in nfa2.accept_states {
             result.add_transition(accept_state + offset2, Symbol::Epsilon, new_accept);
         }
 
@@ -256,14 +256,14 @@ impl NFA {
 
         result.start_state = new_start; // Set new start and new accepts
         result.set_accept_state(new_accept);
-        result.alphabet = nfa.alphabet.clone();
+        result.alphabet = nfa.alphabet;
         return result;
     }
 
     fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
         let mut result: NFA = NFA::new();
-        result.states = nfa1.states.clone(); // Clone all states from nfa1
         let offset = nfa1.states.len();
+        result.states = nfa1.states; // Clone all states from nfa1
 
         // Add states and their transitions from nfa2 into the resultant nfa
         for mut state in nfa2.states {
@@ -313,24 +313,24 @@ impl NFA {
         self.start_state
     }
 
-    pub fn get_state(&self, id: usize) -> NFAState {
+    pub fn get_state(&self, id: usize) -> &NFAState {
         let state = self.states.get(id);
         match state {
-            Some(state) => state.clone(),
+            Some(state) => state,
             None => panic!("Invalid state index provided"),
         }
     }
 
-    pub fn get_alphabet(&self) -> HashSet<char> {
-        return self.alphabet.clone();
+    pub fn get_alphabet(&self) -> &HashSet<char> {
+        return &self.alphabet;
     }
 
-    pub fn get_acceptor_states(&self) -> HashSet<usize> {
-        return self.accept_states.clone();
+    pub fn get_acceptor_states(&self) -> &HashSet<usize> {
+        return &self.accept_states;
     }
 
-    pub fn get_regex(&self) -> String {
-        return self.regex.clone();
+    pub fn get_regex(&self) -> &String {
+        return &self.regex;
     }
 }
 

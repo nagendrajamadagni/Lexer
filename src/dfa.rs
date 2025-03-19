@@ -153,7 +153,7 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> EpsilonClosu
                     let target = *target; // Unboxing the value
                     if !visited.contains(&target) {
                         visited.insert(target);
-                        let next_state = nfa.get_state(target);
+                        let next_state = nfa.get_state(target).clone();
                         nfa_states.push_back(next_state);
                     }
                 }
@@ -178,7 +178,7 @@ fn delta(nfa: &NFA, q: &HashSet<usize>, c: char) -> Option<HashSet<NFAState>> {
         };
         for state_id in target_state_ids {
             let state_id = *state_id; // Unwrapping the box
-            let state = nfa.get_state(state_id);
+            let state = nfa.get_state(state_id).clone();
             result.insert(state);
         }
     }
@@ -191,11 +191,11 @@ fn delta(nfa: &NFA, q: &HashSet<usize>, c: char) -> Option<HashSet<NFAState>> {
 
 pub fn construct_dfa(nfa: NFA) -> DFA {
     let mut result = DFA::new(); // Create new DFA
-    result.alphabet = nfa.get_alphabet(); // DFA has same alphabet as NFA
+    result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
 
     let di = result.add_state(); // Add an iniital state
     result.start_state = di;
-    let n0: NFAState = nfa.get_state(nfa.get_start_state()); // Get n0
+    let n0: NFAState = nfa.get_state(nfa.get_start_state()).clone(); // Get n0
     let mut q_list = HashMap::new(); // Mapping from nfa state set to DFA state
     let mut work_list = VecDeque::new();
 
