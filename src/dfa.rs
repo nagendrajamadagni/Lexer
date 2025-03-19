@@ -3,12 +3,12 @@
 
 use crate::fa::{FAState, Symbol, FA};
 use crate::nfa::{NFAState, NFA};
+use bitvec::prelude::*;
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
 
@@ -16,7 +16,7 @@ use std::process::Command;
 pub struct DFA {
     states: Vec<DFAState>,
     start_state: usize,
-    accept_states: HashSet<usize>,
+    accept_states: BitVec<u8>,
     alphabet: HashSet<char>,
 }
 
@@ -53,7 +53,9 @@ impl FA for DFA {
         let start_node = node_map[&self.start_state];
         graph[start_node] = format!("Start\nState {}", self.start_state);
 
-        for accept in &self.accept_states {
+        let accept_states: Vec<usize> = self.accept_states.iter_ones().collect();
+
+        for accept in accept_states {
             let accept_node = node_map[&accept];
             graph[accept_node] = format!("Accept\nState {}", accept);
         }
@@ -81,14 +83,19 @@ impl FA for DFA {
     }
 
     fn set_accept_state(&mut self, state_id: usize) {
-        self.accept_states.insert(state_id);
+        self.accept_states.set(state_id, true);
     }
 
     fn add_state(&mut self) -> usize {
         let state_id = self.states.len();
         let new_state: DFAState = DFAState::new(state_id);
         self.states.push(new_state.clone());
+        self.accept_states.push(false);
         return state_id;
+    }
+
+    fn get_num_states(&self) -> usize {
+        self.states.len()
     }
 }
 
@@ -112,29 +119,18 @@ impl DFA {
         DFA {
             states: Vec::new(),
             start_state: 0,
-            accept_states: HashSet::new(),
+            accept_states: BitVec::new(),
             alphabet: HashSet::new(),
         }
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
-struct EpsilonClosure(HashSet<usize>);
+fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> BitVec<u8> {
+    let num_states: usize = nfa.get_num_states();
 
-impl Hash for EpsilonClosure {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let mut sorted_values: Vec<_> = self.0.iter().collect();
-        sorted_values.sort();
-        for value in sorted_values {
-            value.hash(state);
-        }
-    }
-}
+    let mut epsilon_closure: BitVec<u8, Lsb0> = BitVec::repeat(false, num_states);
 
-fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> EpsilonClosure {
-    let mut epsilon_closure = HashSet::new();
-
-    let mut visited = HashSet::new();
+    let mut visited: BitVec<u8, Lsb0> = BitVec::repeat(false, num_states);
 
     let mut nfa_states: VecDeque<_> = nfa_states.into_iter().collect();
 
@@ -151,8 +147,8 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> EpsilonClosu
             Some(targets) => {
                 for target in targets {
                     let target = *target; // Unboxing the value
-                    if !visited.contains(&target) {
-                        visited.insert(target);
+                    if !visited[target] {
+                        visited.set(target, true);
                         let next_state = nfa.get_state(target).clone();
                         nfa_states.push_back(next_state);
                     }
@@ -160,16 +156,18 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> EpsilonClosu
             }
             None => {}
         }
-        epsilon_closure.insert(state.get_id()); // Adding the state itself to the epsilon closure
+        epsilon_closure.set(state.get_id(), true); // Adding the state itself to the epsilon closure
     }
-    return EpsilonClosure(epsilon_closure);
+    return epsilon_closure;
 }
 
-fn delta(nfa: &NFA, q: &HashSet<usize>, c: char) -> Option<HashSet<NFAState>> {
+// This function returns the set of states accessible via char c within the set q
+
+fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> Option<HashSet<NFAState>> {
     let mut result = HashSet::new();
-    for nstate in q {
-        let nstate = *nstate; // Unboxing
-        let nfa_state = nfa.get_state(nstate);
+    let nodes: Vec<usize> = q.iter_ones().collect();
+    for node in nodes {
+        let nfa_state = nfa.get_state(node);
         let transitions = nfa_state.get_transitions();
         let target_state_ids = transitions.get(&Symbol::Char(c));
         let target_state_ids = match target_state_ids {
@@ -214,7 +212,7 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
         };
         let dfa_alphabet = result.alphabet.clone();
         for c in dfa_alphabet {
-            let end_states = delta(&nfa, &q.0, c);
+            let end_states = delta(&nfa, &q, c);
             let end_states = match end_states {
                 Some(end_states) => end_states,
                 None => continue,
@@ -226,7 +224,9 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
                 let di = result.add_state();
                 q_list.insert(t.clone(), di);
                 work_list.push_back(t.clone());
-                if !nfa.get_acceptor_states().is_disjoint(&t.0) {
+                let nfa_accepts = nfa.get_acceptor_states().clone();
+                let has_common = (t.clone() & nfa_accepts).any();
+                if has_common {
                     result.set_accept_state(di);
                 }
             }

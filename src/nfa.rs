@@ -1,3 +1,4 @@
+use bitvec::prelude::*;
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
 use std::collections::{HashMap, HashSet};
@@ -19,7 +20,7 @@ pub struct NFAState {
 pub struct NFA {
     states: Vec<NFAState>,
     start_state: usize,
-    accept_states: HashSet<usize>,
+    accept_states: BitVec<u8>,
     alphabet: HashSet<char>,
     regex: String,
 }
@@ -59,7 +60,9 @@ impl FA for NFA {
         let start_node = node_map[&self.start_state];
         graph[start_node] = format!("Start\nState {}", self.start_state);
 
-        for accept in &self.accept_states {
+        let accept_states: Vec<usize> = self.accept_states.iter_ones().collect();
+
+        for accept in accept_states {
             let accept_node = node_map[&accept];
             graph[accept_node] = format!("Accept\nState {}", accept);
         }
@@ -87,14 +90,19 @@ impl FA for NFA {
     }
 
     fn set_accept_state(&mut self, state_id: usize) {
-        self.accept_states.insert(state_id);
+        self.accept_states.set(state_id, true);
     }
 
     fn add_state(&mut self) -> usize {
         let state_id = self.states.len();
         let new_state: NFAState = NFAState::new(state_id);
         self.states.push(new_state);
+        self.accept_states.push(false);
         return state_id;
+    }
+
+    fn get_num_states(&self) -> usize {
+        self.states.len()
     }
 }
 
@@ -126,7 +134,7 @@ impl NFA {
         NFA {
             states: Vec::new(),
             start_state: 0,
-            accept_states: HashSet::new(),
+            accept_states: BitVec::new(),
             alphabet: HashSet::new(),
             regex: "".to_string(),
         }
@@ -153,6 +161,7 @@ impl NFA {
             }
             state.transitions = new_transitions;
             result.states.push(state);
+            result.accept_states.push(false);
         }
 
         // Add epsilon transition from new start to start state of NFA1
@@ -175,6 +184,7 @@ impl NFA {
             }
             state.transitions = new_transitions;
             result.states.push(state);
+            result.accept_states.push(false);
         }
 
         // Add epsilon transition from new start to start state of NFA2
@@ -183,12 +193,15 @@ impl NFA {
         let new_accept = result.add_state();
 
         // Add epsilon transitions from NFA1s accept states to new accept
-        for accept_state in nfa1.accept_states {
+        let nfa1_accepts: Vec<usize> = nfa1.accept_states.iter_ones().collect();
+        for accept_state in nfa1_accepts {
             result.add_transition(accept_state + offset1, Symbol::Epsilon, new_accept);
         }
 
+        let nfa2_accepts: Vec<usize> = nfa2.accept_states.iter_ones().collect();
+
         // Add epsilon transitions from NFA2s accept states to new accept
-        for accept_state in nfa2.accept_states {
+        for accept_state in nfa2_accepts {
             result.add_transition(accept_state + offset2, Symbol::Epsilon, new_accept);
         }
 
@@ -221,6 +234,7 @@ impl NFA {
             }
             state.transitions = new_transitions;
             result.states.push(state);
+            result.accept_states.push(false);
         }
 
         result.add_transition(new_start, Symbol::Epsilon, nfa.start_state + offset); // Add epsilon
@@ -238,7 +252,9 @@ impl NFA {
             Quantifier::Plus => {}
         }
 
-        for accept in nfa.accept_states {
+        let accept_states: Vec<usize> = nfa.accept_states.iter_ones().collect();
+
+        for accept in accept_states {
             // Add epsilon transitions from old accept to new accept
             // and old accept and old start
             match quantifier {
@@ -264,6 +280,7 @@ impl NFA {
         let mut result: NFA = NFA::new();
         let offset = nfa1.states.len();
         result.states = nfa1.states; // Clone all states from nfa1
+        result.accept_states = nfa1.accept_states.clone();
 
         // Add states and their transitions from nfa2 into the resultant nfa
         for mut state in nfa2.states {
@@ -281,18 +298,27 @@ impl NFA {
             }
             state.transitions = new_transitions; // Add the new transitions to new states
             result.states.push(state); // Add the new states to the results
+            result.accept_states.push(false);
         }
 
         // Add epsilon transitions from each acceptor state of NFA1 to start state of NFA2
 
-        for accept_id in nfa1.accept_states {
+        let nfa1_accepts: Vec<usize> = nfa1.accept_states.iter_ones().collect();
+
+        for accept_id in nfa1_accepts {
             result.add_transition(accept_id, Symbol::Epsilon, nfa2.start_state + offset);
         }
 
         result.start_state = nfa1.start_state; // Make the start state of NFA1 the start state of
                                                // the result
-        result.accept_states = nfa2.accept_states.into_iter().map(|s| s + offset).collect(); // Make the accept states of NFA2 the accept
-                                                                                             // states of the result
+        let nfa2_accepts: Vec<usize> = nfa2.accept_states.iter_ones().collect();
+
+        let accept_states: Vec<usize> = nfa2_accepts.into_iter().map(|s| s + offset).collect(); // Make the accept states of NFA2 the accept
+                                                                                                // states of the result
+        for accept in accept_states {
+            result.accept_states.set(accept, true);
+        }
+
         result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
         return result;
     }
@@ -325,7 +351,7 @@ impl NFA {
         return &self.alphabet;
     }
 
-    pub fn get_acceptor_states(&self) -> &HashSet<usize> {
+    pub fn get_acceptor_states(&self) -> &BitVec<u8> {
         return &self.accept_states;
     }
 
