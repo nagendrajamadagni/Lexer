@@ -204,15 +204,16 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
     q_list.insert(q0.clone(), di); // Add it to the mapping
     work_list.push_back(q0); // Add the first nfa states set to the work list
 
+    let dfa_alphabet = result.alphabet.clone();
+
     while !work_list.is_empty() {
         let q = work_list.pop_front();
         let q = match q {
             Some(q) => q,
             None => panic!("Trying to pop empty list!"),
         };
-        let dfa_alphabet = result.alphabet.clone();
-        for c in dfa_alphabet {
-            let end_states = delta(&nfa, &q, c);
+        for c in dfa_alphabet.iter() {
+            let end_states = delta(&nfa, &q, *c);
             let end_states = match end_states {
                 Some(end_states) => end_states,
                 None => continue,
@@ -243,7 +244,7 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
             };
             let di = *di;
             let dq = *dq; // Unwrapping the box
-            result.add_transition(dq, Symbol::Char(c), di);
+            result.add_transition(dq, Symbol::Char(*c), di);
         }
     }
     let regex = nfa.get_regex();
