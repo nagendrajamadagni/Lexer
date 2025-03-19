@@ -2,4 +2,6 @@
 *.jpg
 *.dot
 *.out
+*.cg
+*.out
 Cargo.lock
