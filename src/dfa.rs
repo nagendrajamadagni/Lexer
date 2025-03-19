@@ -2,7 +2,7 @@
  * Apply Hopcroft's algorithm to generate minimal DFA */
 
 use crate::fa::{FAState, Symbol, FA};
-use crate::nfa::{NFAState, NFA};
+use crate::nfa::NFA;
 use bitvec::prelude::*;
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
@@ -89,7 +89,7 @@ impl FA for DFA {
     fn add_state(&mut self) -> usize {
         let state_id = self.states.len();
         let new_state: DFAState = DFAState::new(state_id);
-        self.states.push(new_state.clone());
+        self.states.push(new_state);
         self.accept_states.push(false);
         return state_id;
     }
@@ -125,14 +125,14 @@ impl DFA {
     }
 }
 
-fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> BitVec<u8> {
+fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
     let num_states: usize = nfa.get_num_states();
 
     let mut epsilon_closure: BitVec<u8, Lsb0> = BitVec::repeat(false, num_states);
 
     let mut visited: BitVec<u8, Lsb0> = BitVec::repeat(false, num_states);
 
-    let mut nfa_states: VecDeque<_> = nfa_states.into_iter().collect();
+    let mut nfa_states: VecDeque<_> = nfa_states.iter_ones().collect();
 
     while !nfa_states.is_empty() {
         let state = nfa_states.pop_front();
@@ -140,6 +140,7 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> BitVec<u8> {
             Some(state) => state,
             None => panic!("Trying to remove element from empty queue"),
         };
+        let state = nfa.get_state(state);
         let transitions = state.get_transitions();
 
         let eps_transitions = transitions.get(&Symbol::Epsilon);
@@ -149,8 +150,7 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> BitVec<u8> {
                     let target = *target; // Unboxing the value
                     if !visited[target] {
                         visited.set(target, true);
-                        let next_state = nfa.get_state(target).clone();
-                        nfa_states.push_back(next_state);
+                        nfa_states.push_back(target);
                     }
                 }
             }
@@ -163,8 +163,8 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: HashSet<NFAState>) -> BitVec<u8> {
 
 // This function returns the set of states accessible via char c within the set q
 
-fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> Option<HashSet<NFAState>> {
-    let mut result = HashSet::new();
+fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
+    let mut result = BitVec::repeat(false, q.len());
     let nodes: Vec<usize> = q.iter_ones().collect();
     for node in nodes {
         let nfa_state = nfa.get_state(node);
@@ -176,15 +176,10 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> Option<HashSet<NFAState>> {
         };
         for state_id in target_state_ids {
             let state_id = *state_id; // Unwrapping the box
-            let state = nfa.get_state(state_id).clone();
-            result.insert(state);
+            result.set(state_id, true);
         }
     }
-    if result.is_empty() {
-        return None;
-    } else {
-        return Some(result);
-    }
+    return result;
 }
 
 pub fn construct_dfa(nfa: NFA) -> DFA {
@@ -193,12 +188,12 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
 
     let di = result.add_state(); // Add an iniital state
     result.start_state = di;
-    let n0: NFAState = nfa.get_state(nfa.get_start_state()).clone(); // Get n0
+    let n0: usize = nfa.get_start_state(); // Get n0
     let mut q_list = HashMap::new(); // Mapping from nfa state set to DFA state
     let mut work_list = VecDeque::new();
 
-    let mut nfa_states = HashSet::new(); // Get the initial nfa states
-    nfa_states.insert(n0); // Add the start state to nfa states set
+    let mut nfa_states = BitVec::repeat(false, nfa.get_num_states()); // Get the initial nfa states
+    nfa_states.set(n0, true); // Add the start state to nfa states set
 
     let q0 = get_epsilon_closure(&nfa, nfa_states); // Get its epsilon closure
     q_list.insert(q0.clone(), di); // Add it to the mapping
@@ -210,37 +205,36 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
         let q = work_list.pop_front();
         let q = match q {
             Some(q) => q,
-            None => panic!("Trying to pop empty list!"),
+            None => panic!("trying to pop empty list!"),
         };
         for c in dfa_alphabet.iter() {
             let end_states = delta(&nfa, &q, *c);
-            let end_states = match end_states {
-                Some(end_states) => end_states,
-                None => continue,
-            };
+            if end_states.not_any() {
+                continue;
+            }
             let t = get_epsilon_closure(&nfa, end_states);
 
             if !q_list.contains_key(&t) {
-                // Check if di is as an acceptor state
+                // check if di is as an acceptor state
                 let di = result.add_state();
                 q_list.insert(t.clone(), di);
                 work_list.push_back(t.clone());
-                let nfa_accepts = nfa.get_acceptor_states().clone();
+                let nfa_accepts = nfa.get_acceptor_states();
                 let has_common = (t.clone() & nfa_accepts).any();
                 if has_common {
                     result.set_accept_state(di);
                 }
             }
-            // Add a transition from diq to dit
+            // add a transition from diq to dit
             let dq = q_list.get(&q);
             let dq = match dq {
                 Some(dq) => dq,
-                None => panic!("Value not found in Hash Table"),
+                None => panic!("value not found in hash table"),
             };
             let di = q_list.get(&t);
             let di = match di {
                 Some(di) => di,
-                None => panic!("Value not found in Hash Table"),
+                None => panic!("value not found in hash table"),
             };
             let di = *di;
             let dq = *dq; // Unwrapping the box
