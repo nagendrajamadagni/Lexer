@@ -1,4 +1,5 @@
 /target
 *.jpg
 *.dot
+*.out
 Cargo.lock
