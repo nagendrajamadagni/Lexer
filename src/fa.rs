@@ -1,3 +1,5 @@
+use bitvec::prelude::BitVec;
+use std::collections::HashSet;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Symbol {
     Epsilon,
@@ -10,6 +12,10 @@ pub trait FA {
     fn set_accept_state(&mut self, state_id: usize);
     fn add_state(&mut self) -> usize;
     fn get_num_states(&self) -> usize;
+    fn get_start_state(&self) -> usize;
+    fn get_alphabet(&self) -> &HashSet<char>;
+    fn get_acceptor_states(&self) -> &BitVec<u8>;
+    fn get_regex(&self) -> &String;
 }
 
 pub trait FAState {

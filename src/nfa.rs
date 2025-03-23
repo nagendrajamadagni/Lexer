@@ -104,6 +104,22 @@ impl FA for NFA {
     fn get_num_states(&self) -> usize {
         self.states.len()
     }
+
+    fn get_start_state(&self) -> usize {
+        self.start_state
+    }
+
+    fn get_alphabet(&self) -> &HashSet<char> {
+        return &self.alphabet;
+    }
+
+    fn get_acceptor_states(&self) -> &BitVec<u8> {
+        return &self.accept_states;
+    }
+
+    fn get_regex(&self) -> &String {
+        return &self.regex;
+    }
 }
 
 impl FAState for NFAState {
@@ -335,28 +351,12 @@ impl NFA {
         return result;
     }
 
-    pub fn get_start_state(&self) -> usize {
-        self.start_state
-    }
-
     pub fn get_state(&self, id: usize) -> &NFAState {
         let state = self.states.get(id);
         match state {
             Some(state) => state,
             None => panic!("Invalid state index provided"),
         }
-    }
-
-    pub fn get_alphabet(&self) -> &HashSet<char> {
-        return &self.alphabet;
-    }
-
-    pub fn get_acceptor_states(&self) -> &BitVec<u8> {
-        return &self.accept_states;
-    }
-
-    pub fn get_regex(&self) -> &String {
-        return &self.regex;
     }
 }
 
