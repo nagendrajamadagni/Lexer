@@ -9,6 +9,7 @@ use petgraph::graph::DiGraph;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
 
@@ -18,12 +19,46 @@ pub struct DFA {
     start_state: usize,
     accept_states: BitVec<u8>,
     alphabet: HashSet<char>,
+    regex: String,
 }
 
 #[derive(Debug, Clone)]
 struct DFAState {
     id: usize,
     transitions: HashMap<Symbol, usize>, // Store by reference is not a thing in Rust
+}
+
+#[derive(Clone, Debug)]
+struct SetWrapper<T: Hash + Eq + Clone>(HashSet<T>);
+
+impl<T: Hash + Eq + Clone> PartialEq for SetWrapper<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.len() == other.0.len() && self.0.is_subset(&other.0) // Check if both sets are
+                                                                    // equal
+    }
+}
+
+impl<T: Hash + Eq + Clone> Eq for SetWrapper<T> {}
+
+impl<T: Hash + Eq + Clone> Hash for SetWrapper<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut elems: Vec<&T> = self.0.iter().collect(); // Get list of references for each
+                                                          // element in the set.
+        elems.sort_by_key(|e| {
+            // Sort the list to ensure different order of elements does not
+            // produce different hashes.
+            let mut hasher = DefaultHasher::new();
+            e.hash(&mut hasher); // Calculate the hash of each element
+            hasher.finish() // Return that hash as the key for sorting
+        });
+
+        self.0.len().hash(state); // Use the length as an easy hash to distinguish elements
+
+        for e in elems {
+            // Use the hash of each individual element to compute the final hash
+            e.hash(state);
+        }
+    }
 }
 
 impl FA for DFA {
@@ -57,7 +92,8 @@ impl FA for DFA {
 
         for accept in accept_states {
             let accept_node = node_map[&accept];
-            graph[accept_node] = format!("Accept\nState {}", accept);
+            graph[accept_node] =
+                graph[accept_node].clone() + &format!("\nAccept\nState {}", accept);
         }
 
         let dot = Dot::new(&graph);
@@ -97,6 +133,22 @@ impl FA for DFA {
     fn get_num_states(&self) -> usize {
         self.states.len()
     }
+
+    fn get_start_state(&self) -> usize {
+        self.start_state
+    }
+
+    fn get_alphabet(&self) -> &HashSet<char> {
+        &self.alphabet
+    }
+
+    fn get_acceptor_states(&self) -> &BitVec<u8> {
+        &self.accept_states
+    }
+
+    fn get_regex(&self) -> &String {
+        &self.regex
+    }
 }
 
 impl FAState for DFAState {
@@ -112,6 +164,10 @@ impl DFAState {
             transitions: HashMap::new(),
         }
     }
+
+    fn get_transitions(&self) -> &HashMap<Symbol, usize> {
+        &self.transitions
+    }
 }
 
 impl DFA {
@@ -121,6 +177,19 @@ impl DFA {
             start_state: 0,
             accept_states: BitVec::new(),
             alphabet: HashSet::new(),
+            regex: String::new(),
+        }
+    }
+
+    fn set_regex(&mut self, regex: String) {
+        self.regex = regex;
+    }
+
+    fn get_state(&self, id: usize) -> &DFAState {
+        let state = self.states.get(id);
+        match state {
+            Some(state) => state,
+            None => panic!("Invalid state index provided"),
         }
     }
 }
@@ -182,9 +251,90 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
     return result;
 }
 
+fn split(set: &SetWrapper<usize>, dfa: &DFA) -> HashSet<SetWrapper<usize>> {
+    let mut result: HashSet<SetWrapper<usize>> = HashSet::new();
+    let mut set1 = set.0.clone();
+    let mut set2: HashSet<usize> = HashSet::new();
+    let alphabet = dfa.get_alphabet();
+
+    let member = set1.iter().next();
+    let member = match member {
+        Some(member) => member,
+        None => panic!("Trying to read an empty set!"),
+    };
+    let member = dfa.get_state(*member);
+    let member_transitions = member.get_transitions();
+    // The rest of set1 should have the same transitions as the representative member element
+    // chosen. If it is not the same as member, we remove it and it the element to set2.
+
+    let elements: Vec<_> = set1.iter().copied().collect();
+
+    for c in alphabet {
+        let member_destination = member_transitions.get(&Symbol::Char(*c));
+        for &elem in &elements {
+            let state = dfa.get_state(elem);
+
+            let transitions = state.get_transitions();
+
+            let elem_destination = transitions.get(&Symbol::Char(*c));
+
+            if elem_destination != member_destination {
+                set1.remove(&elem);
+                set2.insert(elem);
+            }
+        }
+    }
+
+    result.insert(SetWrapper(set1));
+
+    if !set2.is_empty() {
+        result.insert(SetWrapper(set2));
+    }
+    return result;
+}
+
+pub fn construct_minimal_dfa(dfa: &DFA) {
+    let mut t: HashSet<SetWrapper<usize>> = HashSet::new();
+    let mut p: HashSet<SetWrapper<usize>> = HashSet::new();
+
+    let states_bitvec = dfa.get_acceptor_states();
+    let mut accept_states: HashSet<usize> = HashSet::new();
+    let mut non_accept_states: HashSet<usize> = HashSet::new();
+
+    for state in states_bitvec.iter_ones() {
+        accept_states.insert(state);
+    }
+
+    for state in states_bitvec.iter_zeros() {
+        non_accept_states.insert(state);
+    }
+
+    t.insert(SetWrapper(accept_states));
+    t.insert(SetWrapper(non_accept_states));
+
+    while p != t {
+        p = t.clone();
+        t = HashSet::new();
+
+        for pset in p.iter() {
+            if pset.0.is_empty() {
+                continue; // Can't split an empty set
+            }
+            let result = split(&pset, &dfa);
+            t = t.union(&result).cloned().collect();
+        }
+    }
+
+    for SetWrapper(set) in p {
+        println!("{:?}", set);
+    }
+}
+
 pub fn construct_dfa(nfa: NFA) -> DFA {
     let mut result = DFA::new(); // Create new DFA
     result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
+
+    let nfa_accepts = nfa.get_acceptor_states();
 
     let di = result.add_state(); // Add an iniital state
     result.start_state = di;
@@ -197,7 +347,13 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
 
     let q0 = get_epsilon_closure(&nfa, nfa_states); // Get its epsilon closure
     q_list.insert(q0.clone(), di); // Add it to the mapping
-    work_list.push_back(q0); // Add the first nfa states set to the work list
+    work_list.push_back(q0.clone()); // Add the first nfa states set to the work list
+
+    let has_common = (q0 & nfa_accepts).any();
+
+    if has_common {
+        result.set_accept_state(di);
+    }
 
     let dfa_alphabet = result.alphabet.clone();
 
@@ -219,7 +375,6 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
                 let di = result.add_state();
                 q_list.insert(t.clone(), di);
                 work_list.push_back(t.clone());
-                let nfa_accepts = nfa.get_acceptor_states();
                 let has_common = (t.clone() & nfa_accepts).any();
                 if has_common {
                     result.set_accept_state(di);
@@ -242,7 +397,9 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
         }
     }
     let regex = nfa.get_regex();
+    result.set_regex(regex.to_string());
     let filename = format!("{regex}_dfa");
     result.show_fa(&filename);
+    construct_minimal_dfa(&result);
     return result;
 }
