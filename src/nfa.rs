@@ -296,7 +296,9 @@ impl NFA {
         let mut result: NFA = NFA::new();
         let offset = nfa1.states.len();
         result.states = nfa1.states; // Clone all states from nfa1
-        result.accept_states = nfa1.accept_states;
+        for _ in &nfa1.accept_states {
+            result.accept_states.push(false);
+        }
 
         // Add states and their transitions from nfa2 into the resultant nfa
         for mut state in nfa2.states {
@@ -312,14 +314,14 @@ impl NFA {
                 }
                 new_transitions.insert(symbol, new_targets);
             }
-            state.transitions = new_transitions; // Add the new transitions to new states
+            state.transitions = new_transitions; // Add the new transitions to new states.
             result.states.push(state); // Add the new states to the results
             result.accept_states.push(false);
         }
 
         // Add epsilon transitions from each acceptor state of NFA1 to start state of NFA2
 
-        let nfa1_accepts: Vec<usize> = result.accept_states.iter_ones().collect();
+        let nfa1_accepts: Vec<usize> = nfa1.accept_states.iter_ones().collect();
 
         for accept_id in nfa1_accepts {
             result.add_transition(accept_id, Symbol::Epsilon, nfa2.start_state + offset);
