@@ -104,6 +104,22 @@ impl FA for NFA {
     fn get_num_states(&self) -> usize {
         self.states.len()
     }
+
+    fn get_start_state(&self) -> usize {
+        self.start_state
+    }
+
+    fn get_alphabet(&self) -> &HashSet<char> {
+        return &self.alphabet;
+    }
+
+    fn get_acceptor_states(&self) -> &BitVec<u8> {
+        return &self.accept_states;
+    }
+
+    fn get_regex(&self) -> &String {
+        return &self.regex;
+    }
 }
 
 impl FAState for NFAState {
@@ -280,7 +296,9 @@ impl NFA {
         let mut result: NFA = NFA::new();
         let offset = nfa1.states.len();
         result.states = nfa1.states; // Clone all states from nfa1
-        result.accept_states = nfa1.accept_states;
+        for _ in &nfa1.accept_states {
+            result.accept_states.push(false);
+        }
 
         // Add states and their transitions from nfa2 into the resultant nfa
         for mut state in nfa2.states {
@@ -296,14 +314,14 @@ impl NFA {
                 }
                 new_transitions.insert(symbol, new_targets);
             }
-            state.transitions = new_transitions; // Add the new transitions to new states
+            state.transitions = new_transitions; // Add the new transitions to new states.
             result.states.push(state); // Add the new states to the results
             result.accept_states.push(false);
         }
 
         // Add epsilon transitions from each acceptor state of NFA1 to start state of NFA2
 
-        let nfa1_accepts: Vec<usize> = result.accept_states.iter_ones().collect();
+        let nfa1_accepts: Vec<usize> = nfa1.accept_states.iter_ones().collect();
 
         for accept_id in nfa1_accepts {
             result.add_transition(accept_id, Symbol::Epsilon, nfa2.start_state + offset);
@@ -335,28 +353,12 @@ impl NFA {
         return result;
     }
 
-    pub fn get_start_state(&self) -> usize {
-        self.start_state
-    }
-
     pub fn get_state(&self, id: usize) -> &NFAState {
         let state = self.states.get(id);
         match state {
             Some(state) => state,
             None => panic!("Invalid state index provided"),
         }
-    }
-
-    pub fn get_alphabet(&self) -> &HashSet<char> {
-        return &self.alphabet;
-    }
-
-    pub fn get_acceptor_states(&self) -> &BitVec<u8> {
-        return &self.accept_states;
-    }
-
-    pub fn get_regex(&self) -> &String {
-        return &self.regex;
     }
 }
 
