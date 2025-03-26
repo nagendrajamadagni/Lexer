@@ -31,6 +31,7 @@ struct DFAState {
 struct LookupTable {
     state_to_set_map: HashMap<usize, usize>,
     set_to_states_map: HashMap<usize, HashSet<usize>>,
+    reduced_states: HashSet<usize>,
 }
 
 impl LookupTable {
@@ -38,7 +39,16 @@ impl LookupTable {
         LookupTable {
             state_to_set_map: HashMap::new(),
             set_to_states_map: HashMap::new(),
+            reduced_states: HashSet::new(),
         }
+    }
+
+    fn is_reduced(&self, state: &usize) -> bool {
+        self.reduced_states.contains(state)
+    }
+
+    fn reduce(&mut self, state: usize) {
+        self.reduced_states.insert(state);
     }
 
     fn insert_state_in_set(&mut self, state: usize, set: usize) {
@@ -277,18 +287,58 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
     return result;
 }
 
+fn compare_transitions(
+    state1: &DFAState,
+    state2: &DFAState,
+    alphabet: &HashSet<char>,
+    lookup_table: &LookupTable,
+) -> bool {
+    let state1_transitions = state1.get_transitions();
+    let state2_transitions = state2.get_transitions();
+
+    let mut same_transitions = true;
+
+    for c in alphabet {
+        if !same_transitions {
+            break;
+        }
+        let state1_dest = state2_transitions.get(&Symbol::Char(*c)); // Get destination
+                                                                     // for the state for
+                                                                     // this symbol and
+                                                                     // member
+        let state2_dest = state1_transitions.get(&Symbol::Char(*c));
+
+        match (state1_dest, state2_dest) {
+            (None, None) => same_transitions = true, // If both don't have a transition, no splitting
+            (Some(_), None) | (None, Some(_)) => {
+                same_transitions = false;
+            } // If only one has a transition, split
+            (Some(state_dest), Some(member_dest)) => {
+                // If both have transitions,
+                // make sure both transition to
+                // same set
+                let state_dest_set = lookup_table.get_set_of_state(state_dest).unwrap();
+                let member_dest_set = lookup_table.get_set_of_state(member_dest).unwrap();
+
+                same_transitions = state_dest_set == member_dest_set;
+            }
+        }
+    }
+    return same_transitions;
+}
+
 fn get_lookup_table(dfa: &DFA) -> LookupTable {
     let alphabet = dfa.get_alphabet();
     let mut lookup_table = LookupTable::new();
     let states = dfa.get_acceptor_states();
     // 0 is non acceptors states, 1 is acceptor states
 
-    for accept_state in states.iter_ones() {
-        lookup_table.insert_state_in_set(accept_state, 1);
-    }
-
     for non_accept_state in states.iter_zeros() {
         lookup_table.insert_state_in_set(non_accept_state, 0);
+    }
+
+    for accept_state in states.iter_ones() {
+        lookup_table.insert_state_in_set(accept_state, 1);
     }
 
     loop {
@@ -298,9 +348,11 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
 
         // Try to split the sets further
 
-        for set in sets {
+        for set in sets.iter() {
             if set.len() == 1 {
                 // Cannot split a set with only 1 element
+                let singleton_element = set.iter().next().unwrap();
+                lookup_table.reduce(*singleton_element);
                 continue;
             }
             let next_set = lookup_table.get_num_sets(); // The next set which will be inserted
@@ -312,44 +364,23 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
 
             let member_state = dfa.get_state(*member_state_id);
 
-            let member_state_transitions = member_state.get_transitions();
+            let mut reduced = true; // Assume that the set will be reduced in this iteration
 
             for state_id in set {
-                let state = dfa.get_state(state_id);
-                let state_transitions = state.get_transitions();
+                if lookup_table.is_reduced(state_id) {
+                    continue;
+                }
+                let state = dfa.get_state(*state_id);
 
-                for c in alphabet {
-                    let state_dest = state_transitions.get(&Symbol::Char(*c)); // Get destination
-                                                                               // for the state for
-                                                                               // this symbol and
-                                                                               // member
-                    let member_dest = member_state_transitions.get(&Symbol::Char(*c));
+                if !compare_transitions(state, member_state, alphabet, &lookup_table) {
+                    lookup_table.insert_state_in_set(*state_id, next_set);
+                    reduced = false;
+                }
+            }
 
-                    match (state_dest, member_dest) {
-                        (None, None) => continue, // If both don't have a transition, no splitting
-                        (Some(_), None) | (None, Some(_)) => {
-                            // If only one has a transition,
-                            // split
-                            lookup_table.insert_state_in_set(state_id, next_set);
-                            continue;
-                        }
-                        (Some(state_dest), Some(member_dest)) => {
-                            // If both have transitions,
-                            // make sure both transition to
-                            // same set
-                            let state_dest_set = lookup_table.get_set_of_state(state_dest).unwrap();
-                            let member_dest_set =
-                                lookup_table.get_set_of_state(member_dest).unwrap();
-
-                            if state_dest_set == member_dest_set {
-                                continue;
-                            } else {
-                                // If not, split
-                                lookup_table.insert_state_in_set(state_id, next_set);
-                                break;
-                            }
-                        }
-                    }
+            if reduced {
+                for state_id in set {
+                    lookup_table.reduce(*state_id);
                 }
             }
         }
@@ -373,6 +404,8 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
     // Clone the alphabet for the new DFA
 
     minimal_dfa.alphabet = dfa.alphabet.clone();
+
+    minimal_dfa.set_regex(dfa.get_regex().to_string());
 
     // For every set in the lookup table, add a state
 
@@ -425,8 +458,6 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
             }
         }
     }
-
-    minimal_dfa.set_regex(dfa.get_regex().to_string());
 
     let regex = minimal_dfa.get_regex();
 
