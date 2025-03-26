@@ -78,8 +78,10 @@ impl LookupTable {
         self.state_to_set_map.get(state)
     }
 
-    fn get_states_in_set(&self, set: &usize) -> Option<&HashSet<usize>> {
-        self.set_to_states_map.get(set)
+    fn get_states_of_set(&self, set: &usize) {
+        for state in self.set_to_states_map.get(set) {
+            println!("{:?}", state);
+        }
     }
 
     fn get_num_sets(&self) -> usize {
@@ -281,18 +283,18 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
     return result;
 }
 
-pub fn construct_minimal_dfa(dfa: &DFA) {
+fn get_lookup_table(dfa: &DFA) -> LookupTable {
     let alphabet = dfa.get_alphabet();
     let mut lookup_table = LookupTable::new();
     let states = dfa.get_acceptor_states();
-    // 0 is acceptors states, 1 is non acceptor states
+    // 0 is non acceptors states, 1 is acceptor states
 
     for accept_state in states.iter_ones() {
-        lookup_table.insert_state_in_set(accept_state, 0);
+        lookup_table.insert_state_in_set(accept_state, 1);
     }
 
     for non_accept_state in states.iter_zeros() {
-        lookup_table.insert_state_in_set(non_accept_state, 1);
+        lookup_table.insert_state_in_set(non_accept_state, 0);
     }
 
     loop {
@@ -303,11 +305,12 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
         // Try to split the sets further
 
         for set in sets {
+            println!("Currently splitting set {:?}", set);
             if set.len() == 1 {
                 // Cannot split a set with only 1 element
                 continue;
             }
-            let next_set = lookup_table.get_num_sets() + 1; // The next set which will be inserted
+            let next_set = lookup_table.get_num_sets(); // The next set which will be inserted
             let member_state_id = set.iter().next();
             let member_state_id = match member_state_id {
                 Some(id) => id,
@@ -363,7 +366,16 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
             break;
         }
     }
+    return lookup_table;
+}
 
+pub fn construct_minimal_dfa(dfa: &DFA) {
+    let lookup_table = get_lookup_table(dfa);
+    let num_sets = lookup_table.get_num_sets();
+    println!("The number of sets is {:?}", num_sets);
+    for i in 0..num_sets {
+        lookup_table.get_states_of_set(&i);
+    }
     let sets = lookup_table.get_sets();
 
     // Create a new DFA
@@ -376,7 +388,7 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
 
     // For every set in the lookup table, add a state
 
-    for _ in 0..(lookup_table.get_num_sets() + 1) {
+    for _ in 0..(lookup_table.get_num_sets()) {
         minimal_dfa.add_state();
     }
 
@@ -405,11 +417,12 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
     }
 
     for set in sets {
-        println!("This is a new set");
+        println!("The set is {:?}", set);
         for elem in set {
             let state = dfa.get_state(*elem);
             let transitions = state.get_transitions();
             let minimal_set = lookup_table.get_set_of_state(elem);
+            println!("{:?} belongs to {:?}", elem, minimal_set);
             let minimal_set = match minimal_set {
                 Some(set) => set,
                 None => panic!("Provided set does not exist in any state!"),
@@ -422,6 +435,10 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
                     Some(set) => set,
                     None => panic!("Provided set does not exist in any state!"),
                 };
+                println!(
+                    "Trying to add transition from {:?} to {:?}",
+                    minimal_set, destination_set
+                );
                 minimal_dfa.add_transition(*minimal_set, transition.0.clone(), *destination_set);
             }
         }
