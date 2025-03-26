@@ -78,12 +78,6 @@ impl LookupTable {
         self.state_to_set_map.get(state)
     }
 
-    fn get_states_of_set(&self, set: &usize) {
-        for state in self.set_to_states_map.get(set) {
-            println!("{:?}", state);
-        }
-    }
-
     fn get_num_sets(&self) -> usize {
         self.set_to_states_map.len()
     }
@@ -305,7 +299,6 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
         // Try to split the sets further
 
         for set in sets {
-            println!("Currently splitting set {:?}", set);
             if set.len() == 1 {
                 // Cannot split a set with only 1 element
                 continue;
@@ -371,11 +364,6 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
 
 pub fn construct_minimal_dfa(dfa: &DFA) {
     let lookup_table = get_lookup_table(dfa);
-    let num_sets = lookup_table.get_num_sets();
-    println!("The number of sets is {:?}", num_sets);
-    for i in 0..num_sets {
-        lookup_table.get_states_of_set(&i);
-    }
     let sets = lookup_table.get_sets();
 
     // Create a new DFA
@@ -417,12 +405,10 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
     }
 
     for set in sets {
-        println!("The set is {:?}", set);
         for elem in set {
             let state = dfa.get_state(*elem);
             let transitions = state.get_transitions();
             let minimal_set = lookup_table.get_set_of_state(elem);
-            println!("{:?} belongs to {:?}", elem, minimal_set);
             let minimal_set = match minimal_set {
                 Some(set) => set,
                 None => panic!("Provided set does not exist in any state!"),
@@ -435,10 +421,6 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
                     Some(set) => set,
                     None => panic!("Provided set does not exist in any state!"),
                 };
-                println!(
-                    "Trying to add transition from {:?} to {:?}",
-                    minimal_set, destination_set
-                );
                 minimal_dfa.add_transition(*minimal_set, transition.0.clone(), *destination_set);
             }
         }
