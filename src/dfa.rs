@@ -6,10 +6,10 @@ use crate::nfa::NFA;
 use bitvec::prelude::*;
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
+use std::collections::hash_map::Values;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
 
@@ -28,36 +28,66 @@ struct DFAState {
     transitions: HashMap<Symbol, usize>, // Store by reference is not a thing in Rust
 }
 
-#[derive(Clone, Debug)]
-struct SetWrapper<T: Hash + Eq + Clone>(HashSet<T>);
-
-impl<T: Hash + Eq + Clone> PartialEq for SetWrapper<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.len() == other.0.len() && self.0.is_subset(&other.0) // Check if both sets are
-                                                                    // equal
-    }
+struct LookupTable {
+    state_to_set_map: HashMap<usize, usize>,
+    set_to_states_map: HashMap<usize, HashSet<usize>>,
 }
 
-impl<T: Hash + Eq + Clone> Eq for SetWrapper<T> {}
-
-impl<T: Hash + Eq + Clone> Hash for SetWrapper<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let mut elems: Vec<&T> = self.0.iter().collect(); // Get list of references for each
-                                                          // element in the set.
-        elems.sort_by_key(|e| {
-            // Sort the list to ensure different order of elements does not
-            // produce different hashes.
-            let mut hasher = DefaultHasher::new();
-            e.hash(&mut hasher); // Calculate the hash of each element
-            hasher.finish() // Return that hash as the key for sorting
-        });
-
-        self.0.len().hash(state); // Use the length as an easy hash to distinguish elements
-
-        for e in elems {
-            // Use the hash of each individual element to compute the final hash
-            e.hash(state);
+impl LookupTable {
+    fn new() -> Self {
+        LookupTable {
+            state_to_set_map: HashMap::new(),
+            set_to_states_map: HashMap::new(),
         }
+    }
+
+    fn insert_state_in_set(&mut self, state: usize, set: usize) {
+        let prev_set = self.state_to_set_map.insert(state, set);
+        match prev_set {
+            None => {
+                // If state was not in a previous set, insert it into the provided set
+                self.set_to_states_map
+                    .entry(set)
+                    .or_insert_with(HashSet::new)
+                    .insert(state);
+            }
+            Some(prev_set_key) => {
+                // If state was present in a previous set, remove it from previous set and insert
+                // it into new set
+
+                if let Some(prev_set) = self.set_to_states_map.get_mut(&prev_set_key) {
+                    prev_set.remove(&state);
+                    if prev_set.is_empty() {
+                        self.set_to_states_map.remove(&prev_set_key);
+                    }
+                }
+
+                self.set_to_states_map
+                    .entry(set)
+                    .or_insert_with(HashSet::new)
+                    .insert(state);
+            }
+        }
+        self.set_to_states_map
+            .entry(set)
+            .or_insert_with(HashSet::new)
+            .insert(state);
+    }
+
+    fn get_set_of_state(&self, state: &usize) -> Option<&usize> {
+        self.state_to_set_map.get(state)
+    }
+
+    fn get_states_in_set(&self, set: &usize) -> Option<&HashSet<usize>> {
+        self.set_to_states_map.get(set)
+    }
+
+    fn get_num_sets(&self) -> usize {
+        self.set_to_states_map.len()
+    }
+
+    fn get_sets(&self) -> Values<usize, HashSet<usize>> {
+        self.set_to_states_map.values()
     }
 }
 
@@ -251,85 +281,99 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
     return result;
 }
 
-fn split(set: &SetWrapper<usize>, dfa: &DFA) -> HashSet<SetWrapper<usize>> {
-    let mut result: HashSet<SetWrapper<usize>> = HashSet::new();
-    let mut set1 = set.0.clone();
-    let mut set2: HashSet<usize> = HashSet::new();
-    let alphabet = dfa.get_alphabet();
-
-    let member = set1.iter().next();
-    let member = match member {
-        Some(member) => member,
-        None => panic!("Trying to read an empty set!"),
-    };
-    let member = dfa.get_state(*member);
-    let member_transitions = member.get_transitions();
-    // The rest of set1 should have the same transitions as the representative member element
-    // chosen. If it is not the same as member, we remove it and it the element to set2.
-
-    let elements: Vec<_> = set1.iter().copied().collect();
-
-    for c in alphabet {
-        let member_destination = member_transitions.get(&Symbol::Char(*c));
-        for &elem in &elements {
-            let state = dfa.get_state(elem);
-
-            let transitions = state.get_transitions();
-
-            let elem_destination = transitions.get(&Symbol::Char(*c));
-
-            if elem_destination != member_destination {
-                set1.remove(&elem);
-                set2.insert(elem);
-            }
-        }
-    }
-
-    result.insert(SetWrapper(set1));
-
-    if !set2.is_empty() {
-        result.insert(SetWrapper(set2));
-    }
-    return result;
-}
-
 pub fn construct_minimal_dfa(dfa: &DFA) {
-    let mut t: HashSet<SetWrapper<usize>> = HashSet::new();
-    let mut p: HashSet<SetWrapper<usize>> = HashSet::new();
+    let alphabet = dfa.get_alphabet();
+    let mut lookup_table = LookupTable::new();
+    let states = dfa.get_acceptor_states();
+    // 0 is acceptors states, 1 is non acceptor states
 
-    let states_bitvec = dfa.get_acceptor_states();
-    let mut accept_states: HashSet<usize> = HashSet::new();
-    let mut non_accept_states: HashSet<usize> = HashSet::new();
-
-    for state in states_bitvec.iter_ones() {
-        accept_states.insert(state);
+    for accept_state in states.iter_ones() {
+        lookup_table.insert_state_in_set(accept_state, 0);
     }
 
-    for state in states_bitvec.iter_zeros() {
-        non_accept_states.insert(state);
+    for non_accept_state in states.iter_zeros() {
+        lookup_table.insert_state_in_set(non_accept_state, 1);
     }
 
-    t.insert(SetWrapper(accept_states));
-    t.insert(SetWrapper(non_accept_states));
+    loop {
+        let number_of_sets = lookup_table.get_num_sets(); // Get number of sets at start of
+                                                          // iteration
+        let sets: Vec<_> = lookup_table.get_sets().cloned().collect(); // Get list of sets
 
-    while p != t {
-        p = t.clone();
-        t = HashSet::new();
+        // Try to split the sets further
 
-        for pset in p.iter() {
-            if pset.0.is_empty() {
-                continue; // Can't split an empty set
+        for set in sets {
+            if set.len() == 1 {
+                // Cannot split a set with only 1 element
+                continue;
             }
-            let result = split(&pset, &dfa);
-            t = t.union(&result).cloned().collect();
+            let next_set = lookup_table.get_num_sets() + 1; // The next set which will be inserted
+            let member_state_id = set.iter().next();
+            let member_state_id = match member_state_id {
+                Some(id) => id,
+                None => panic!("Trying to remove element from empty set!"),
+            };
+
+            let member_state = dfa.get_state(*member_state_id);
+
+            let member_state_transitions = member_state.get_transitions();
+
+            for state_id in set {
+                let state = dfa.get_state(state_id);
+                let state_transitions = state.get_transitions();
+
+                for c in alphabet {
+                    let state_dest = state_transitions.get(&Symbol::Char(*c)); // Get destination
+                                                                               // for the state for
+                                                                               // this symbol and
+                                                                               // member
+                    let member_dest = member_state_transitions.get(&Symbol::Char(*c));
+
+                    match (state_dest, member_dest) {
+                        (None, None) => continue, // If both don't have a transition, no splitting
+                        (Some(_), None) | (None, Some(_)) => {
+                            // If only one has a transition,
+                            // split
+                            lookup_table.insert_state_in_set(state_id, next_set);
+                            continue;
+                        }
+                        (Some(state_dest), Some(member_dest)) => {
+                            // If both have transitions,
+                            // make sure both transition to
+                            // same set
+                            let state_dest_set = lookup_table.get_set_of_state(state_dest).unwrap();
+                            let member_dest_set =
+                                lookup_table.get_set_of_state(member_dest).unwrap();
+
+                            if state_dest_set == member_dest_set {
+                                continue;
+                            } else {
+                                // If not, split
+                                lookup_table.insert_state_in_set(state_id, next_set);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let new_number_of_sets = lookup_table.get_num_sets();
+
+        if number_of_sets == new_number_of_sets {
+            break;
         }
     }
 
-    for SetWrapper(set) in p {
-        println!("{:?}", set);
+    let sets = lookup_table.get_sets();
+
+    let minimal_dfa = DFA::new();
+
+    let start_state = dfa.get_start_state();
+
+    for set in sets {
+        println!("The set is {:?}", set);
     }
 }
-
 pub fn construct_dfa(nfa: NFA) -> DFA {
     let mut result = DFA::new(); // Create new DFA
     result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
