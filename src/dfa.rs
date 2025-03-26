@@ -366,13 +366,74 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
 
     let sets = lookup_table.get_sets();
 
-    let minimal_dfa = DFA::new();
+    // Create a new DFA
+
+    let mut minimal_dfa = DFA::new();
+
+    // Clone the alphabet for the new DFA
+
+    minimal_dfa.alphabet = dfa.alphabet.clone();
+
+    // For every set in the lookup table, add a state
+
+    for _ in 0..(lookup_table.get_num_sets() + 1) {
+        minimal_dfa.add_state();
+    }
+
+    // Get the set to which the current DFA's start state belongs to and mark the state
+    // corresponsing to that set id as the starting state.
 
     let start_state = dfa.get_start_state();
 
-    for set in sets {
-        println!("The set is {:?}", set);
+    let start_set = lookup_table.get_set_of_state(&start_state);
+
+    let start_set = match start_set {
+        Some(set) => set,
+        None => panic!("Invalid set number provided!"),
+    };
+
+    minimal_dfa.start_state = *start_set;
+
+    // Repeat the same process as above for the acceptor states
+
+    let acceptor_states = dfa.get_acceptor_states();
+
+    for accept_state in acceptor_states.iter_ones() {
+        if let Some(accept_set) = lookup_table.get_set_of_state(&accept_state) {
+            minimal_dfa.set_accept_state(*accept_set);
+        }
     }
+
+    for set in sets {
+        println!("This is a new set");
+        for elem in set {
+            let state = dfa.get_state(*elem);
+            let transitions = state.get_transitions();
+            let minimal_set = lookup_table.get_set_of_state(elem);
+            let minimal_set = match minimal_set {
+                Some(set) => set,
+                None => panic!("Provided set does not exist in any state!"),
+            };
+
+            for transition in transitions {
+                let destination_state = transition.1;
+                let destination_set = lookup_table.get_set_of_state(destination_state);
+                let destination_set = match destination_set {
+                    Some(set) => set,
+                    None => panic!("Provided set does not exist in any state!"),
+                };
+                minimal_dfa.add_transition(*minimal_set, transition.0.clone(), *destination_set);
+            }
+        }
+    }
+
+    minimal_dfa.set_regex(dfa.get_regex().to_string());
+
+    let regex = minimal_dfa.get_regex();
+
+    let filename = format!("{regex}_minimal_dfa");
+
+    minimal_dfa.show_fa(&filename);
 }
 pub fn construct_dfa(nfa: NFA) -> DFA {
     let mut result = DFA::new(); // Create new DFA
