@@ -57,8 +57,8 @@ impl FA for NFA {
 
         // Mark Start and Accept States
 
-        let start_node = node_map[&self.start_state];
-        graph[start_node] = format!("Start\nState {}", self.start_state);
+        let start_node = node_map[&self.get_start_state()];
+        graph[start_node] = format!("Start\nState {}", self.get_start_state());
 
         let accept_states: Vec<usize> = self.accept_states.iter_ones().collect();
 
@@ -91,6 +91,10 @@ impl FA for NFA {
 
     fn set_accept_state(&mut self, state_id: usize) {
         self.accept_states.set(state_id, true);
+    }
+
+    fn set_start_state(&mut self, state_id: usize) {
+        self.start_state = state_id;
     }
 
     fn add_state(&mut self) -> usize {
@@ -221,7 +225,7 @@ impl NFA {
             result.add_transition(accept_state + offset2, Symbol::Epsilon, new_accept);
         }
 
-        result.start_state = new_start;
+        result.set_start_state(new_start);
         result.set_accept_state(new_accept);
         result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
 
@@ -286,7 +290,7 @@ impl NFA {
             result.add_transition(accept + offset, Symbol::Epsilon, new_accept);
         }
 
-        result.start_state = new_start; // Set new start and new accepts
+        result.set_start_state(new_start); // Set new start and new accepts
         result.set_accept_state(new_accept);
         result.alphabet = nfa.alphabet;
         return result;
@@ -327,8 +331,8 @@ impl NFA {
             result.add_transition(accept_id, Symbol::Epsilon, nfa2.start_state + offset);
         }
 
-        result.start_state = nfa1.start_state; // Make the start state of NFA1 the start state of
-                                               // the result
+        result.set_start_state(nfa1.start_state); // Make the start state of NFA1 the start state of
+                                                  // the result
         let nfa2_accepts: Vec<usize> = nfa2.accept_states.iter_ones().collect();
 
         let accept_states: Vec<usize> = nfa2_accepts.into_iter().map(|s| s + offset).collect(); // Make the accept states of NFA2 the accept
@@ -348,7 +352,7 @@ impl NFA {
         result.alphabet.insert(character);
         result.add_transition(start_state, Symbol::Char(character), end_state);
 
-        result.start_state = start_state;
+        result.set_start_state(start_state);
         result.set_accept_state(end_state);
         return result;
     }

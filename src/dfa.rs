@@ -158,6 +158,10 @@ impl FA for DFA {
         self.accept_states.set(state_id, true);
     }
 
+    fn set_start_state(&mut self, state_id: usize) {
+        self.start_state = state_id;
+    }
+
     fn add_state(&mut self) -> usize {
         let state_id = self.states.len();
         let new_state: DFAState = DFAState::new(state_id);
@@ -393,8 +397,12 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
     return lookup_table;
 }
 
-pub fn construct_minimal_dfa(dfa: &DFA) {
-    let lookup_table = get_lookup_table(dfa);
+fn reorder_minimal_dfa(_dfa: &DFA) -> DFA {
+    return DFA::new();
+}
+
+pub fn construct_minimal_dfa(dfa: DFA) -> DFA {
+    let lookup_table = get_lookup_table(&dfa);
     let sets = lookup_table.get_sets();
 
     // Create a new DFA
@@ -425,7 +433,7 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
         None => panic!("Invalid set number provided!"),
     };
 
-    minimal_dfa.start_state = *start_set;
+    minimal_dfa.set_start_state(*start_set);
 
     // Repeat the same process as above for the acceptor states
 
@@ -444,7 +452,7 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
             let minimal_set = lookup_table.get_set_of_state(elem);
             let minimal_set = match minimal_set {
                 Some(set) => set,
-                None => panic!("Provided set does not exist in any state!"),
+                None => panic!("Provided state does not exist in any set!"),
             };
 
             for transition in transitions {
@@ -452,7 +460,7 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
                 let destination_set = lookup_table.get_set_of_state(destination_state);
                 let destination_set = match destination_set {
                     Some(set) => set,
-                    None => panic!("Provided set does not exist in any state!"),
+                    None => panic!("Provided state does not exist in any set!"),
                 };
                 minimal_dfa.add_transition(*minimal_set, transition.0.clone(), *destination_set);
             }
@@ -461,10 +469,14 @@ pub fn construct_minimal_dfa(dfa: &DFA) {
 
     let regex = minimal_dfa.get_regex();
 
+    let result = reorder_minimal_dfa(&minimal_dfa);
+
     let filename = format!("{regex}_minimal_dfa");
 
     minimal_dfa.show_fa(&filename);
+    return minimal_dfa;
 }
+
 pub fn construct_dfa(nfa: NFA) -> DFA {
     let mut result = DFA::new(); // Create new DFA
     result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
@@ -472,7 +484,8 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
     let nfa_accepts = nfa.get_acceptor_states();
 
     let di = result.add_state(); // Add an iniital state
-    result.start_state = di;
+
+    result.set_start_state(di);
     let n0: usize = nfa.get_start_state(); // Get n0
     let mut q_list = HashMap::new(); // Mapping from nfa state set to DFA state
     let mut work_list = VecDeque::new();
@@ -535,6 +548,5 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
     result.set_regex(regex.to_string());
     let filename = format!("{regex}_dfa");
     result.show_fa(&filename);
-    construct_minimal_dfa(&result);
     return result;
 }
