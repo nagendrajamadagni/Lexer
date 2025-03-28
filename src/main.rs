@@ -15,5 +15,6 @@ fn main() {
 
     let nfa = nfa::construct_nfa(&args[1], syntax_tree);
 
-    let _dfa = dfa::construct_dfa(nfa);
+    let dfa = dfa::construct_dfa(nfa);
+    let _dfa = dfa::construct_minimal_dfa(dfa);
 }
