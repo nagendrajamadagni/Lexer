@@ -103,13 +103,13 @@ impl FA for DFA {
         let mut node_map = std::collections::HashMap::new();
 
         // Add nodes
-        for state in &self.states {
+        for state in self.get_states() {
             let node = graph.add_node(format!("State {}", state.id));
             node_map.insert(state.id, node);
         }
 
         // Add edges
-        for state in &self.states {
+        for state in self.get_states() {
             for (symbol, target) in &state.transitions {
                 let symbol_str = match symbol {
                     Symbol::Char(c) => c.to_string(),
@@ -239,6 +239,10 @@ impl DFA {
             Some(state) => state,
             None => panic!("Invalid state index provided"),
         }
+    }
+
+    fn get_states(&self) -> Vec<DFAState> {
+        self.states.clone()
     }
 }
 
