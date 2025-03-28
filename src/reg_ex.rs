@@ -4,12 +4,6 @@
 use std::collections::HashSet;
 
 #[derive(Debug)]
-pub struct Range {
-    start: char,
-    end: char,
-}
-
-#[derive(Debug)]
 pub enum Quantifier {
     Star,
     Question,
