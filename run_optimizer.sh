@@ -6,7 +6,7 @@ docker run -it --rm \
 docker run -it --rm \
   -v $(pwd):/app \
   -w /app \
-  rust-valgrind-profiler valgrind --tool=massif --stacks=yes ./target/release/Lexer "a(b|c)*"
+  rust-valgrind-profiler valgrind --tool=massif --stacks=yes ./target/release/Lexer "[a-zA-Z_]"
 
 docker run -it --rm \
     -v $(pwd):/app \
@@ -16,7 +16,7 @@ docker run -it --rm \
 docker run -it --rm \
     -v $(pwd):/app \
     -w /app \
-    rust-valgrind-profiler valgrind --tool=callgrind --cache-sim=yes ./target/release/Lexer "a(b|c)*"
+    rust-valgrind-profiler valgrind --tool=callgrind --cache-sim=yes ./target/release/Lexer "[a-zA-Z_]"
 
 mv massif.out.1 ./massif_output/massif_$(date +"%d_%m_%Y_%H_%M_%S").out
 mv callgrind.out.1 ./callgrind_output/callgrind_$(date +"%d_%m_%Y_%H_%M_%S").out
