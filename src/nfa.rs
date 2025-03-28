@@ -128,6 +128,10 @@ impl FA for NFA {
     fn get_regex(&self) -> &String {
         return &self.regex;
     }
+
+    fn add_alphabet(&mut self, ch: char) {
+        self.alphabet.insert(ch);
+    }
 }
 
 impl FAState for NFAState {
@@ -231,7 +235,12 @@ impl NFA {
 
         result.set_start_state(new_start);
         result.set_accept_state(new_accept);
-        result.set_alphabet(nfa1.alphabet.union(&nfa2.alphabet).cloned().collect());
+        result.set_alphabet(
+            nfa1.get_alphabet()
+                .union(&nfa2.get_alphabet())
+                .cloned()
+                .collect(),
+        );
 
         return result;
     }
@@ -296,7 +305,7 @@ impl NFA {
 
         result.set_start_state(new_start); // Set new start and new accepts
         result.set_accept_state(new_accept);
-        result.set_alphabet(nfa.alphabet);
+        result.set_alphabet(nfa.get_alphabet().clone());
         return result;
     }
 
@@ -345,7 +354,12 @@ impl NFA {
             result.accept_states.set(accept, true);
         }
 
-        result.set_alphabet(nfa1.alphabet.union(&nfa2.alphabet).cloned().collect());
+        result.set_alphabet(
+            nfa1.get_alphabet()
+                .union(&nfa2.get_alphabet())
+                .cloned()
+                .collect(),
+        );
         return result;
     }
 
@@ -353,7 +367,7 @@ impl NFA {
         let mut result: NFA = NFA::new();
         let start_state = result.add_state();
         let end_state = result.add_state();
-        result.alphabet.insert(character);
+        result.add_alphabet(character);
         result.add_transition(start_state, Symbol::Char(character), end_state);
 
         result.set_start_state(start_state);
