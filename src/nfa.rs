@@ -117,6 +117,10 @@ impl FA for NFA {
         return &self.alphabet;
     }
 
+    fn set_alphabet(&mut self, alphabet: HashSet<char>) {
+        self.alphabet = alphabet;
+    }
+
     fn get_acceptor_states(&self) -> &BitVec<u8> {
         return &self.accept_states;
     }
@@ -227,7 +231,7 @@ impl NFA {
 
         result.set_start_state(new_start);
         result.set_accept_state(new_accept);
-        result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
+        result.set_alphabet(nfa1.alphabet.union(&nfa2.alphabet).cloned().collect());
 
         return result;
     }
@@ -292,7 +296,7 @@ impl NFA {
 
         result.set_start_state(new_start); // Set new start and new accepts
         result.set_accept_state(new_accept);
-        result.alphabet = nfa.alphabet;
+        result.set_alphabet(nfa.alphabet);
         return result;
     }
 
@@ -341,7 +345,7 @@ impl NFA {
             result.accept_states.set(accept, true);
         }
 
-        result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
+        result.set_alphabet(nfa1.alphabet.union(&nfa2.alphabet).cloned().collect());
         return result;
     }
 

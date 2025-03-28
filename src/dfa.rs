@@ -182,6 +182,10 @@ impl FA for DFA {
         &self.alphabet
     }
 
+    fn set_alphabet(&mut self, alphabet: HashSet<char>) {
+        self.alphabet = alphabet;
+    }
+
     fn get_acceptor_states(&self) -> &BitVec<u8> {
         &self.accept_states
     }
@@ -411,7 +415,7 @@ pub fn construct_minimal_dfa(dfa: DFA) -> DFA {
 
     // Clone the alphabet for the new DFA
 
-    minimal_dfa.alphabet = dfa.alphabet.clone();
+    minimal_dfa.set_alphabet(dfa.alphabet.clone());
 
     minimal_dfa.set_regex(dfa.get_regex().to_string());
 
@@ -479,7 +483,7 @@ pub fn construct_minimal_dfa(dfa: DFA) -> DFA {
 
 pub fn construct_dfa(nfa: NFA) -> DFA {
     let mut result = DFA::new(); // Create new DFA
-    result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
+    result.set_alphabet(nfa.get_alphabet().clone()); // DFA has same alphabet as NFA
 
     let nfa_accepts = nfa.get_acceptor_states();
 
