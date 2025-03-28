@@ -370,6 +370,15 @@ fn parse_base_tree(tree: Base) -> NFA {
             let regex = *regex;
             parse_regex_tree(regex)
         }
+        Base::CharSet(char_set) => {
+            let next_char = char_set.iter().next().unwrap();
+            let mut result = NFA::literal_construction(*next_char);
+            for char in char_set {
+                let char_nfa = NFA::literal_construction(char);
+                result = NFA::alternation(char_nfa, result);
+            }
+            return result;
+        }
     }
 }
 

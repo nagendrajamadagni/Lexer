@@ -1,6 +1,8 @@
 /* Good resource for parsing regex at
  * https://matt.might.net/articles/parsing-regex-with-recursive-descent/ */
 
+use std::collections::HashSet;
+
 #[derive(Debug)]
 pub enum Quantifier {
     Star,
@@ -13,6 +15,7 @@ pub enum Base {
     Character(char),
     EscapeCharacter(char),
     Exp(Box<RegEx>),
+    CharSet(HashSet<char>),
 }
 
 #[derive(Debug)]
@@ -45,6 +48,14 @@ fn balanced_brackets(reg_ex: &str) -> bool {
                     return false;
                 }
             }
+            '[' => {
+                stack.push(ch);
+            }
+            ']' => {
+                if stack.is_empty() || stack.pop() != Some('[') {
+                    return false;
+                }
+            }
             _ => {}
         }
     }
@@ -53,9 +64,33 @@ fn balanced_brackets(reg_ex: &str) -> bool {
 
 fn nchar_is_valid(nchar: char) -> bool {
     match nchar {
-        '*' | '|' | '?' | ')' => false,
+        '*' | '|' | '?' | ')' | ']' => false,
         _ => true,
     }
+}
+
+fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
+    let mut new_start = start;
+    let mut char_set: HashSet<char> = HashSet::new();
+
+    while new_start < regex.len() && regex.chars().nth(new_start).unwrap() != ']' {
+        if regex.chars().nth(new_start + 1).unwrap() == '-' {
+            let char_start = regex.chars().nth(new_start).unwrap();
+            let char_end = regex.chars().nth(new_start + 2).unwrap();
+            if char_end < char_start {
+                panic!("Invalid character range provided");
+            }
+            for char in char_start..=char_end {
+                char_set.insert(char);
+            }
+            new_start = new_start + 3;
+        } else {
+            char_set.insert(regex.chars().nth(new_start).unwrap());
+            new_start = new_start + 1;
+        }
+    }
+
+    return (char_set, new_start);
 }
 
 fn parse_base(regex: &str, start: usize) -> (Base, usize) {
@@ -65,9 +100,14 @@ fn parse_base(regex: &str, start: usize) -> (Base, usize) {
         Some(nchar) => nchar,
     };
     if nchar == '(' {
-        let (inner_regex, new_start) = parse_regex(regex, start + 1);
+        let (inner_regex, new_start) = parse_regex(regex, start + 1); // Consume the lparen
         let new_base = Base::Exp(Box::new(inner_regex));
         let new_start = new_start + 1; // Consume the rparen
+        (new_base, new_start)
+    } else if nchar == '[' {
+        let (char_set, new_start) = parse_char_class(regex, start + 1);
+        let new_start = new_start + 1; // Consume the rparen
+        let new_base = Base::CharSet(char_set);
         (new_base, new_start)
     } else if nchar == '\\' {
         let new_base = Base::EscapeCharacter(regex.chars().nth(start + 1).unwrap());
