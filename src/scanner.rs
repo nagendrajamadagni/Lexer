@@ -29,10 +29,12 @@ impl Scanner {
 
         alphabet.sort(); // Sort the alphabet so that the transition table is in order
 
-        for _ in 0..num_states {
+        let num_chars = alphabet.len();
+
+        for _ in 0..=num_states {
             let mut column_vec: Vec<i32> = Vec::new();
-            for _ in 0..alphabet.len() {
-                column_vec.push(-1);
+            for _ in 0..=num_chars {
+                column_vec.push(num_states.try_into().unwrap());
             }
             self.transition_table.push(column_vec);
         }
