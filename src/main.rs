@@ -4,6 +4,7 @@ mod dfa;
 mod fa;
 mod nfa;
 mod reg_ex;
+mod scanner;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,5 +17,7 @@ fn main() {
     let nfa = nfa::construct_nfa(&args[1], syntax_tree);
 
     let dfa = dfa::construct_dfa(nfa);
-    let _dfa = dfa::construct_minimal_dfa(dfa);
+    let dfa = dfa::construct_minimal_dfa(dfa);
+
+    scanner::construct_scanner(&dfa);
 }

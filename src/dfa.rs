@@ -23,7 +23,7 @@ pub struct DFA {
 }
 
 #[derive(Debug, Clone)]
-struct DFAState {
+pub struct DFAState {
     id: usize,
     transitions: HashMap<Symbol, usize>, // Store by reference is not a thing in Rust
 }
@@ -213,7 +213,7 @@ impl DFAState {
         }
     }
 
-    fn get_transitions(&self) -> &HashMap<Symbol, usize> {
+    pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
         &self.transitions
     }
 }
@@ -233,7 +233,7 @@ impl DFA {
         self.regex = regex;
     }
 
-    fn get_state(&self, id: usize) -> &DFAState {
+    pub fn get_state(&self, id: usize) -> &DFAState {
         let state = self.states.get(id);
         match state {
             Some(state) => state,
@@ -249,7 +249,7 @@ impl DFA {
         }
     }
 
-    fn get_states(&self) -> Vec<DFAState> {
+    pub fn get_states(&self) -> Vec<DFAState> {
         self.states.clone()
     }
 }
@@ -575,7 +575,12 @@ pub fn construct_minimal_dfa(dfa: DFA) -> DFA {
     minimal_dfa.show_fa(&filename);
 
     let filename = format!("{regex}_minimal_reordered_dfa");
-    let result = reorder_minimal_dfa(&minimal_dfa);
+    let mut result = reorder_minimal_dfa(&minimal_dfa);
+
+    result.set_alphabet(dfa.alphabet.clone());
+
+    result.set_regex(dfa.regex);
+
     result.show_fa(&filename);
 
     return result;
