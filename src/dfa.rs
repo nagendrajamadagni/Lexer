@@ -23,7 +23,7 @@ pub struct DFA {
 }
 
 #[derive(Debug, Clone)]
-struct DFAState {
+pub struct DFAState {
     id: usize,
     transitions: HashMap<Symbol, usize>, // Store by reference is not a thing in Rust
 }
@@ -78,10 +78,6 @@ impl LookupTable {
                     .insert(state);
             }
         }
-        self.set_to_states_map
-            .entry(set)
-            .or_insert_with(HashSet::new)
-            .insert(state);
     }
 
     fn get_set_of_state(&self, state: &usize) -> Option<&usize> {
@@ -213,7 +209,7 @@ impl DFAState {
         }
     }
 
-    fn get_transitions(&self) -> &HashMap<Symbol, usize> {
+    pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
         &self.transitions
     }
 }
@@ -233,7 +229,7 @@ impl DFA {
         self.regex = regex;
     }
 
-    fn get_state(&self, id: usize) -> &DFAState {
+    pub fn get_state(&self, id: usize) -> &DFAState {
         let state = self.states.get(id);
         match state {
             Some(state) => state,
@@ -249,7 +245,7 @@ impl DFA {
         }
     }
 
-    fn get_states(&self) -> Vec<DFAState> {
+    pub fn get_states(&self) -> Vec<DFAState> {
         self.states.clone()
     }
 }
@@ -356,13 +352,20 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
     let mut lookup_table = LookupTable::new();
     let states = dfa.get_acceptor_states();
     // 0 is non acceptors states, 1 is acceptor states
+    // If all states are acceptor states, then 0 is the only set id
+
+    let set_id = 0;
 
     for non_accept_state in states.iter_zeros() {
-        lookup_table.insert_state_in_set(non_accept_state, 0);
+        lookup_table.insert_state_in_set(non_accept_state, set_id);
     }
 
+    let set_id = if states.all() { 0 } else { 1 }; // Test if all bits are 1, i.e all states are
+                                                   // acceptors and there are no non acceptor
+                                                   // states
+
     for accept_state in states.iter_ones() {
-        lookup_table.insert_state_in_set(accept_state, 1);
+        lookup_table.insert_state_in_set(accept_state, set_id);
     }
 
     loop {
@@ -575,7 +578,12 @@ pub fn construct_minimal_dfa(dfa: DFA) -> DFA {
     minimal_dfa.show_fa(&filename);
 
     let filename = format!("{regex}_minimal_reordered_dfa");
-    let result = reorder_minimal_dfa(&minimal_dfa);
+    let mut result = reorder_minimal_dfa(&minimal_dfa);
+
+    result.set_alphabet(dfa.alphabet.clone());
+
+    result.set_regex(dfa.regex);
+
     result.show_fa(&filename);
 
     return result;
