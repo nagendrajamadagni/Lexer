@@ -386,6 +386,10 @@ impl NFA {
     fn get_states(&self) -> Vec<NFAState> {
         return self.states.clone();
     }
+
+    fn set_regex(&mut self, regex: String) {
+        self.regex = regex;
+    }
 }
 
 fn parse_base_tree(tree: Base) -> NFA {
@@ -444,10 +448,12 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
     }
 }
 
-pub fn construct_nfa(regex: &str, syntax_tree: RegEx) -> NFA {
+pub fn construct_nfa(regex: &str, syntax_tree: RegEx, save_nfa: bool) -> NFA {
     let mut nfa = parse_regex_tree(syntax_tree);
-    nfa.regex = regex.to_string();
-    let filename = format!("{regex}_nfa");
-    nfa.show_fa(&filename);
+    nfa.set_regex(regex.to_string());
+    if save_nfa {
+        let filename = format!("{regex}_nfa");
+        nfa.show_fa(&filename);
+    }
     nfa
 }

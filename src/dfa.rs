@@ -507,7 +507,7 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
     return result;
 }
 
-pub fn construct_minimal_dfa(dfa: DFA) -> DFA {
+pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
     let lookup_table = get_lookup_table(&dfa);
     let sets = lookup_table.get_sets();
 
@@ -574,22 +574,22 @@ pub fn construct_minimal_dfa(dfa: DFA) -> DFA {
     }
 
     let regex = minimal_dfa.get_regex();
-    let filename = format!("{regex}_minimal_dfa");
-    minimal_dfa.show_fa(&filename);
 
-    let filename = format!("{regex}_minimal_reordered_dfa");
     let mut result = reorder_minimal_dfa(&minimal_dfa);
 
     result.set_alphabet(dfa.alphabet.clone());
 
     result.set_regex(dfa.regex);
 
-    result.show_fa(&filename);
+    if save_minimal_dfa {
+        let filename = format!("{regex}_minimal_dfa");
+        result.show_fa(&filename);
+    }
 
     return result;
 }
 
-pub fn construct_dfa(nfa: NFA) -> DFA {
+pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
     let mut result = DFA::new(); // Create new DFA
     result.set_alphabet(nfa.get_alphabet().clone()); // DFA has same alphabet as NFA
 
@@ -658,7 +658,9 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
     }
     let regex = nfa.get_regex();
     result.set_regex(regex.to_string());
-    let filename = format!("{regex}_dfa");
-    result.show_fa(&filename);
+    if save_dfa {
+        let filename = format!("{regex}_dfa");
+        result.show_fa(&filename);
+    }
     return result;
 }
