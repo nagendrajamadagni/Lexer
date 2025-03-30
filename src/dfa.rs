@@ -6,6 +6,7 @@ use crate::nfa::NFA;
 use bitvec::prelude::*;
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
+use std::collections::hash_map::Values;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -18,12 +19,78 @@ pub struct DFA {
     start_state: usize,
     accept_states: BitVec<u8>,
     alphabet: HashSet<char>,
+    regex: String,
 }
 
 #[derive(Debug, Clone)]
-struct DFAState {
+pub struct DFAState {
     id: usize,
     transitions: HashMap<Symbol, usize>, // Store by reference is not a thing in Rust
+}
+
+struct LookupTable {
+    state_to_set_map: HashMap<usize, usize>,
+    set_to_states_map: HashMap<usize, HashSet<usize>>,
+    reduced_states: HashSet<usize>,
+}
+
+impl LookupTable {
+    fn new() -> Self {
+        LookupTable {
+            state_to_set_map: HashMap::new(),
+            set_to_states_map: HashMap::new(),
+            reduced_states: HashSet::new(),
+        }
+    }
+
+    fn is_reduced(&self, state: &usize) -> bool {
+        self.reduced_states.contains(state)
+    }
+
+    fn reduce(&mut self, state: usize) {
+        self.reduced_states.insert(state);
+    }
+
+    fn insert_state_in_set(&mut self, state: usize, set: usize) {
+        let prev_set = self.state_to_set_map.insert(state, set);
+        match prev_set {
+            None => {
+                // If state was not in a previous set, insert it into the provided set
+                self.set_to_states_map
+                    .entry(set)
+                    .or_insert_with(HashSet::new)
+                    .insert(state);
+            }
+            Some(prev_set_key) => {
+                // If state was present in a previous set, remove it from previous set and insert
+                // it into new set
+
+                if let Some(prev_set) = self.set_to_states_map.get_mut(&prev_set_key) {
+                    prev_set.remove(&state);
+                    if prev_set.is_empty() {
+                        self.set_to_states_map.remove(&prev_set_key);
+                    }
+                }
+
+                self.set_to_states_map
+                    .entry(set)
+                    .or_insert_with(HashSet::new)
+                    .insert(state);
+            }
+        }
+    }
+
+    fn get_set_of_state(&self, state: &usize) -> Option<&usize> {
+        self.state_to_set_map.get(state)
+    }
+
+    fn get_num_sets(&self) -> usize {
+        self.set_to_states_map.len()
+    }
+
+    fn get_sets(&self) -> Values<usize, HashSet<usize>> {
+        self.set_to_states_map.values()
+    }
 }
 
 impl FA for DFA {
@@ -32,13 +99,13 @@ impl FA for DFA {
         let mut node_map = std::collections::HashMap::new();
 
         // Add nodes
-        for state in &self.states {
+        for state in self.get_states() {
             let node = graph.add_node(format!("State {}", state.id));
             node_map.insert(state.id, node);
         }
 
         // Add edges
-        for state in &self.states {
+        for state in self.get_states() {
             for (symbol, target) in &state.transitions {
                 let symbol_str = match symbol {
                     Symbol::Char(c) => c.to_string(),
@@ -57,7 +124,8 @@ impl FA for DFA {
 
         for accept in accept_states {
             let accept_node = node_map[&accept];
-            graph[accept_node] = format!("Accept\nState {}", accept);
+            graph[accept_node] =
+                graph[accept_node].clone() + &format!("\nAccept\nState {}", accept);
         }
 
         let dot = Dot::new(&graph);
@@ -86,6 +154,10 @@ impl FA for DFA {
         self.accept_states.set(state_id, true);
     }
 
+    fn set_start_state(&mut self, state_id: usize) {
+        self.start_state = state_id;
+    }
+
     fn add_state(&mut self) -> usize {
         let state_id = self.states.len();
         let new_state: DFAState = DFAState::new(state_id);
@@ -96,6 +168,30 @@ impl FA for DFA {
 
     fn get_num_states(&self) -> usize {
         self.states.len()
+    }
+
+    fn get_start_state(&self) -> usize {
+        self.start_state
+    }
+
+    fn get_alphabet(&self) -> &HashSet<char> {
+        &self.alphabet
+    }
+
+    fn set_alphabet(&mut self, alphabet: HashSet<char>) {
+        self.alphabet = alphabet;
+    }
+
+    fn get_acceptor_states(&self) -> &BitVec<u8> {
+        &self.accept_states
+    }
+
+    fn get_regex(&self) -> &String {
+        &self.regex
+    }
+
+    fn add_alphabet(&mut self, ch: char) {
+        self.alphabet.insert(ch);
     }
 }
 
@@ -112,6 +208,10 @@ impl DFAState {
             transitions: HashMap::new(),
         }
     }
+
+    pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
+        &self.transitions
+    }
 }
 
 impl DFA {
@@ -121,7 +221,32 @@ impl DFA {
             start_state: 0,
             accept_states: BitVec::new(),
             alphabet: HashSet::new(),
+            regex: String::new(),
         }
+    }
+
+    fn set_regex(&mut self, regex: String) {
+        self.regex = regex;
+    }
+
+    pub fn get_state(&self, id: usize) -> &DFAState {
+        let state = self.states.get(id);
+        match state {
+            Some(state) => state,
+            None => panic!("Invalid state index provided"),
+        }
+    }
+
+    fn get_state_mut(&mut self, id: usize) -> &mut DFAState {
+        let state = self.states.get_mut(id);
+        match state {
+            Some(state) => state,
+            None => panic!("Invalid state index provided"),
+        }
+    }
+
+    pub fn get_states(&self) -> Vec<DFAState> {
+        self.states.clone()
     }
 }
 
@@ -182,12 +307,297 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
     return result;
 }
 
-pub fn construct_dfa(nfa: NFA) -> DFA {
+fn compare_transitions(
+    state1: &DFAState,
+    state2: &DFAState,
+    alphabet: &HashSet<char>,
+    lookup_table: &LookupTable,
+) -> bool {
+    let state1_transitions = state1.get_transitions();
+    let state2_transitions = state2.get_transitions();
+
+    let mut same_transitions = true;
+
+    for c in alphabet {
+        if !same_transitions {
+            break;
+        }
+        let state1_dest = state2_transitions.get(&Symbol::Char(*c)); // Get destination
+                                                                     // for the state for
+                                                                     // this symbol and
+                                                                     // member
+        let state2_dest = state1_transitions.get(&Symbol::Char(*c));
+
+        match (state1_dest, state2_dest) {
+            (None, None) => same_transitions = true, // If both don't have a transition, no splitting
+            (Some(_), None) | (None, Some(_)) => {
+                same_transitions = false;
+            } // If only one has a transition, split
+            (Some(state_dest), Some(member_dest)) => {
+                // If both have transitions,
+                // make sure both transition to
+                // same set
+                let state_dest_set = lookup_table.get_set_of_state(state_dest).unwrap();
+                let member_dest_set = lookup_table.get_set_of_state(member_dest).unwrap();
+
+                same_transitions = state_dest_set == member_dest_set;
+            }
+        }
+    }
+    return same_transitions;
+}
+
+fn get_lookup_table(dfa: &DFA) -> LookupTable {
+    let alphabet = dfa.get_alphabet();
+    let mut lookup_table = LookupTable::new();
+    let states = dfa.get_acceptor_states();
+    // 0 is non acceptors states, 1 is acceptor states
+    // If all states are acceptor states, then 0 is the only set id
+
+    let set_id = 0;
+
+    for non_accept_state in states.iter_zeros() {
+        lookup_table.insert_state_in_set(non_accept_state, set_id);
+    }
+
+    let set_id = if states.all() { 0 } else { 1 }; // Test if all bits are 1, i.e all states are
+                                                   // acceptors and there are no non acceptor
+                                                   // states
+
+    for accept_state in states.iter_ones() {
+        lookup_table.insert_state_in_set(accept_state, set_id);
+    }
+
+    loop {
+        let number_of_sets = lookup_table.get_num_sets(); // Get number of sets at start of
+                                                          // iteration
+        let sets: Vec<_> = lookup_table.get_sets().cloned().collect(); // Get list of sets
+
+        // Try to split the sets further
+
+        for set in sets.iter() {
+            if set.len() == 1 {
+                // Cannot split a set with only 1 element
+                let singleton_element = set.iter().next().unwrap();
+                lookup_table.reduce(*singleton_element);
+                continue;
+            }
+            let next_set = lookup_table.get_num_sets(); // The next set which will be inserted
+            let member_state_id = set.iter().next();
+            let member_state_id = match member_state_id {
+                Some(id) => id,
+                None => panic!("Trying to remove element from empty set!"),
+            };
+
+            let member_state = dfa.get_state(*member_state_id);
+
+            let mut reduced = true; // Assume that the set will be reduced in this iteration
+
+            for state_id in set {
+                if lookup_table.is_reduced(state_id) {
+                    continue;
+                }
+                let state = dfa.get_state(*state_id);
+
+                if !compare_transitions(state, member_state, alphabet, &lookup_table) {
+                    lookup_table.insert_state_in_set(*state_id, next_set);
+                    reduced = false;
+                }
+            }
+
+            if reduced {
+                for state_id in set {
+                    lookup_table.reduce(*state_id);
+                }
+            }
+        }
+        let new_number_of_sets = lookup_table.get_num_sets();
+
+        if number_of_sets == new_number_of_sets {
+            break;
+        }
+    }
+    return lookup_table;
+}
+
+fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
+    let mut result = DFA::new(); // Set up result DFA
+    let mut reorder_map = HashMap::new(); // Set up a re-order table
+    let mut stack: VecDeque<usize> = VecDeque::new(); // Set up a stack for DFS
+
+    let mut visited: BitVec<u8, Lsb0> = BitVec::repeat(false, dfa.get_num_states());
+
+    for _ in 0..dfa.get_num_states() {
+        // Add as many states as in the initial DFA because
+        // we are not adding or removing ant states, just
+        // re-ordering them.
+        result.add_state();
+    }
+    let dfa_start = dfa.get_start_state(); // Get the starting dfa state
+
+    let mut next_id = 0;
+
+    stack.push_front(dfa_start); // Add the start state to the stack
+
+    while !stack.is_empty() {
+        // Start DFS
+        let state_id = stack.pop_front().unwrap(); // Get the head of stack
+
+        if *visited.get(state_id).unwrap() {
+            // If node is already visited skip
+            continue;
+        }
+
+        visited.set(state_id, true); // Mark the current node as visited
+
+        let reorder_state_id = match reorder_map.get(&state_id) {
+            Some(&id) => id,
+            None => {
+                reorder_map.insert(state_id, next_id);
+                let reordered_id = next_id;
+                next_id = next_id + 1;
+                reordered_id
+            }
+        }; // Get the re-ordered equivalent state or add one
+
+        let state = dfa.get_state(state_id); // Get the state from the dfa
+
+        let transitions = state.get_transitions(); // Get the transitions from the original state
+
+        let reorder_state: &mut DFAState = result.get_state_mut(reorder_state_id); // Get the state from the
+                                                                                   // re-ordered DFA
+
+        for transition in transitions {
+            // For each transition, check if the target state is
+            // present
+            let symbol = transition.0.clone();
+            let target = transition.1;
+
+            let reorder_target_id = match reorder_map.get(target) {
+                // If not present, take the next available state and map it to the current
+                // un-ordered state
+                Some(&id) => id,
+                None => {
+                    let state_id = next_id;
+                    reorder_map.insert(*target, state_id);
+                    next_id = next_id + 1; // Pick the next available id
+                    state_id
+                }
+            };
+
+            reorder_state.add_transition(symbol, reorder_target_id); // Add a transition from the
+                                                                     // reordered state to the
+                                                                     // reordered target
+            stack.push_front(*target); // Add the target to the head of the stack now
+        }
+    }
+
+    let start_state = dfa.get_start_state();
+
+    let reordered_start_state = reorder_map.get(&start_state).unwrap();
+    result.set_start_state(*reordered_start_state);
+
+    // Mark the acceptor states
+
+    for accept in dfa.get_acceptor_states().iter_ones() {
+        let remapped_id = reorder_map.get(&accept).unwrap();
+        result.set_accept_state(*remapped_id);
+    }
+
+    return result;
+}
+
+pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
+    let lookup_table = get_lookup_table(&dfa);
+    let sets = lookup_table.get_sets();
+
+    // Create a new DFA
+
+    let mut minimal_dfa = DFA::new();
+
+    // Clone the alphabet for the new DFA
+
+    minimal_dfa.set_alphabet(dfa.alphabet.clone());
+
+    minimal_dfa.set_regex(dfa.get_regex().to_string());
+
+    // For every set in the lookup table, add a state
+
+    for _ in 0..(lookup_table.get_num_sets()) {
+        minimal_dfa.add_state();
+    }
+
+    // Get the set to which the current DFA's start state belongs to and mark the state
+    // corresponsing to that set id as the starting state.
+
+    let start_state = dfa.get_start_state();
+
+    let start_set = lookup_table.get_set_of_state(&start_state);
+
+    let start_set = match start_set {
+        Some(set) => set,
+        None => panic!("Invalid set number provided!"),
+    };
+
+    minimal_dfa.set_start_state(*start_set);
+
+    // Repeat the same process as above for the acceptor states
+
+    let acceptor_states = dfa.get_acceptor_states();
+
+    for accept_state in acceptor_states.iter_ones() {
+        if let Some(accept_set) = lookup_table.get_set_of_state(&accept_state) {
+            minimal_dfa.set_accept_state(*accept_set);
+        }
+    }
+
+    for set in sets {
+        for elem in set {
+            let state = dfa.get_state(*elem);
+            let transitions = state.get_transitions();
+            let minimal_set = lookup_table.get_set_of_state(elem);
+            let minimal_set = match minimal_set {
+                Some(set) => set,
+                None => panic!("Provided state does not exist in any set!"),
+            };
+
+            for transition in transitions {
+                let destination_state = transition.1;
+                let destination_set = lookup_table.get_set_of_state(destination_state);
+                let destination_set = match destination_set {
+                    Some(set) => set,
+                    None => panic!("Provided state does not exist in any set!"),
+                };
+                minimal_dfa.add_transition(*minimal_set, transition.0.clone(), *destination_set);
+            }
+        }
+    }
+
+    let regex = minimal_dfa.get_regex();
+
+    let mut result = reorder_minimal_dfa(&minimal_dfa);
+
+    result.set_alphabet(dfa.alphabet.clone());
+
+    result.set_regex(dfa.regex);
+
+    if save_minimal_dfa {
+        let filename = format!("{regex}_minimal_dfa");
+        result.show_fa(&filename);
+    }
+
+    return result;
+}
+
+pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
     let mut result = DFA::new(); // Create new DFA
-    result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
+    result.set_alphabet(nfa.get_alphabet().clone()); // DFA has same alphabet as NFA
+
+    let nfa_accepts = nfa.get_acceptor_states();
 
     let di = result.add_state(); // Add an iniital state
-    result.start_state = di;
+
+    result.set_start_state(di);
     let n0: usize = nfa.get_start_state(); // Get n0
     let mut q_list = HashMap::new(); // Mapping from nfa state set to DFA state
     let mut work_list = VecDeque::new();
@@ -197,7 +607,13 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
 
     let q0 = get_epsilon_closure(&nfa, nfa_states); // Get its epsilon closure
     q_list.insert(q0.clone(), di); // Add it to the mapping
-    work_list.push_back(q0); // Add the first nfa states set to the work list
+    work_list.push_back(q0.clone()); // Add the first nfa states set to the work list
+
+    let has_common = (q0 & nfa_accepts).any();
+
+    if has_common {
+        result.set_accept_state(di);
+    }
 
     let dfa_alphabet = result.alphabet.clone();
 
@@ -219,7 +635,6 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
                 let di = result.add_state();
                 q_list.insert(t.clone(), di);
                 work_list.push_back(t.clone());
-                let nfa_accepts = nfa.get_acceptor_states();
                 let has_common = (t.clone() & nfa_accepts).any();
                 if has_common {
                     result.set_accept_state(di);
@@ -242,7 +657,10 @@ pub fn construct_dfa(nfa: NFA) -> DFA {
         }
     }
     let regex = nfa.get_regex();
-    let filename = format!("{regex}_dfa");
-    result.show_fa(&filename);
+    result.set_regex(regex.to_string());
+    if save_dfa {
+        let filename = format!("{regex}_dfa");
+        result.show_fa(&filename);
+    }
     return result;
 }
