@@ -78,10 +78,6 @@ impl LookupTable {
                     .insert(state);
             }
         }
-        self.set_to_states_map
-            .entry(set)
-            .or_insert_with(HashSet::new)
-            .insert(state);
     }
 
     fn get_set_of_state(&self, state: &usize) -> Option<&usize> {
@@ -356,13 +352,20 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
     let mut lookup_table = LookupTable::new();
     let states = dfa.get_acceptor_states();
     // 0 is non acceptors states, 1 is acceptor states
+    // If all states are acceptor states, then 0 is the only set id
+
+    let set_id = 0;
 
     for non_accept_state in states.iter_zeros() {
-        lookup_table.insert_state_in_set(non_accept_state, 0);
+        lookup_table.insert_state_in_set(non_accept_state, set_id);
     }
 
+    let set_id = if states.all() { 0 } else { 1 }; // Test if all bits are 1, i.e all states are
+                                                   // acceptors and there are no non acceptor
+                                                   // states
+
     for accept_state in states.iter_ones() {
-        lookup_table.insert_state_in_set(accept_state, 1);
+        lookup_table.insert_state_in_set(accept_state, set_id);
     }
 
     loop {
