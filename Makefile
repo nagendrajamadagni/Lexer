@@ -6,5 +6,5 @@ run:
 	cargo run "(a|b)(c|d)"
 
 .PHONY clean:
-	rm *.jpg
-	rm *.dot
+	rm -f *.jpg
+	rm -f *.dot
