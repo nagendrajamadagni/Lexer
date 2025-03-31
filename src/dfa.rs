@@ -386,8 +386,18 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
                                                    // acceptors and there are no non acceptor
                                                    // states
 
+    let mut category_set_id: HashMap<String, usize> = HashMap::new(); // Mapping of category of accept state and set id
+
     for accept_state in states.iter_ones() {
-        lookup_table.insert_state_in_set(accept_state, set_id);
+        let category = dfa.get_state(accept_state).get_category();
+        let offset_map_len = set_id + category_set_id.len();
+
+        let insert_id = category_set_id
+            // Need to map categories to a set_id
+            .entry(category.to_string())
+            .or_insert(offset_map_len);
+
+        lookup_table.insert_state_in_set(accept_state, *insert_id);
     }
 
     loop {
@@ -523,7 +533,9 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
 
     for accept in dfa.get_acceptor_states().iter_ones() {
         let remapped_id = reorder_map.get(&accept).unwrap();
+        let category = dfa.get_state(accept).get_category();
         result.set_accept_state(*remapped_id);
+        result.set_accept_category(category);
     }
 
     return result;
@@ -568,8 +580,10 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
     let acceptor_states = dfa.get_acceptor_states();
 
     for accept_state in acceptor_states.iter_ones() {
+        let category = dfa.get_state(accept_state).get_category();
         if let Some(accept_set) = lookup_table.get_set_of_state(&accept_state) {
             minimal_dfa.set_accept_state(*accept_set);
+            minimal_dfa.set_accept_category(category);
         }
     }
 
