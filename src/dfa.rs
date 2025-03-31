@@ -26,6 +26,7 @@ pub struct DFA {
 pub struct DFAState {
     id: usize,
     transitions: HashMap<Symbol, usize>, // Store by reference is not a thing in Rust
+    category: String,
 }
 
 struct LookupTable {
@@ -206,11 +207,21 @@ impl DFAState {
         DFAState {
             id,
             transitions: HashMap::new(),
+            category: String::new(),
         }
     }
 
     pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
         &self.transitions
+    }
+
+    fn set_category(&mut self, category: String) {
+        println!("The category is being set for state {:?}", self.id);
+        self.category = category;
+    }
+
+    fn get_category(&self) -> &String {
+        &self.category
     }
 }
 
@@ -247,6 +258,18 @@ impl DFA {
 
     pub fn get_states(&self) -> Vec<DFAState> {
         self.states.clone()
+    }
+
+    fn set_accept_category(&mut self, category: &String) {
+        let accept_states = self.get_acceptor_states().clone();
+
+        for accept_state in accept_states.iter_ones() {
+            let state = self.get_state_mut(accept_state);
+            let old_category = state.get_category();
+            if old_category.is_empty() {
+                state.set_category(category.clone());
+            }
+        }
     }
 }
 
@@ -609,10 +632,18 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
     q_list.insert(q0.clone(), di); // Add it to the mapping
     work_list.push_back(q0.clone()); // Add the first nfa states set to the work list
 
-    let has_common = (q0 & nfa_accepts).any();
+    let has_common = (q0.clone() & nfa_accepts).any();
 
     if has_common {
         result.set_accept_state(di);
+
+        for state in q0.iter_ones() {
+            let category = nfa.get_state(state).get_category();
+            if !category.is_empty() {
+                println!("The category being set is {:?}", category);
+                result.set_accept_category(category);
+            }
+        }
     }
 
     let dfa_alphabet = result.alphabet.clone();
@@ -638,6 +669,13 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
                 let has_common = (t.clone() & nfa_accepts).any();
                 if has_common {
                     result.set_accept_state(di);
+                    for state in t.iter_ones() {
+                        let category = nfa.get_state(state).get_category();
+                        if !category.is_empty() {
+                            println!("The category being set is {:?}", category);
+                            result.set_accept_category(category);
+                        }
+                    }
                 }
             }
             // add a transition from diq to dit
@@ -661,6 +699,10 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
     if save_dfa {
         let filename = format!("{regex}_dfa");
         result.show_fa(&filename);
+    }
+
+    for state in result.get_states() {
+        println!("The state is {:?}", state);
     }
     return result;
 }
