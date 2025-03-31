@@ -1,7 +1,7 @@
 use bitvec::prelude::*;
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -14,6 +14,7 @@ use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
 pub struct NFAState {
     id: usize,
     transitions: HashMap<Symbol, HashSet<usize>>, // Store by reference is not a thing in Rust
+    category: String,
 }
 
 #[derive(Debug)]
@@ -145,6 +146,7 @@ impl NFAState {
         NFAState {
             id,
             transitions: HashMap::new(),
+            category: String::new(),
         }
     }
 
@@ -154,6 +156,14 @@ impl NFAState {
 
     pub fn get_id(&self) -> usize {
         return self.id;
+    }
+
+    fn set_category(&mut self, category: String) {
+        self.category = category;
+    }
+
+    pub fn get_category(&self) -> &String {
+        &self.category
     }
 }
 
@@ -383,12 +393,32 @@ impl NFA {
         }
     }
 
+    fn get_mut_state(&mut self, id: usize) -> &mut NFAState {
+        let state = self.states.get_mut(id);
+        match state {
+            Some(state) => state,
+            None => panic!("Invalid state index provided"),
+        }
+    }
+
     fn get_states(&self) -> Vec<NFAState> {
         return self.states.clone();
     }
 
     fn set_regex(&mut self, regex: String) {
         self.regex = regex;
+    }
+
+    fn set_accept_category(&mut self, category: String) {
+        let accept_states = self.get_acceptor_states().clone();
+
+        for state in accept_states.iter_ones() {
+            let state = self.get_mut_state(state);
+            let old_category = state.get_category();
+            if old_category.is_empty() {
+                state.set_category(category.clone());
+            }
+        }
     }
 }
 
@@ -448,12 +478,34 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
     }
 }
 
-pub fn construct_nfa(regex: &str, syntax_tree: RegEx, save_nfa: bool) -> NFA {
-    let mut nfa = parse_regex_tree(syntax_tree);
-    nfa.set_regex(regex.to_string());
-    if save_nfa {
-        let filename = format!("{regex}_nfa");
-        nfa.show_fa(&filename);
+pub fn construct_nfa(
+    mut syntax_tree_list: VecDeque<(String, RegEx, String)>,
+    save_nfa: bool,
+) -> NFA {
+    let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
+
+    let mut result = parse_regex_tree(syntax_tree);
+    result.set_regex(regex.to_string());
+    result.set_accept_category(category);
+
+    while !syntax_tree_list.is_empty() {
+        let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
+        let mut nfa = parse_regex_tree(syntax_tree);
+        nfa.set_regex(regex.to_string());
+        nfa.set_accept_category(category);
+        let old_regex = result.get_regex().clone();
+        result = NFA::alternation(result, nfa);
+        let new_regex = format!("{old_regex}|{regex}");
+        result.set_regex(new_regex);
     }
-    nfa
+    if save_nfa {
+        let regex = result.get_regex();
+        let filename = format!("{regex}_nfa");
+        result.show_fa(&filename);
+    }
+
+    for state in result.get_states() {
+        println!("The state is {:?}", state);
+    }
+    result
 }
