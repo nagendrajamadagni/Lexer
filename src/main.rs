@@ -9,20 +9,37 @@ mod reg_ex;
 mod scanner;
 
 fn main() {
-    let args = Command::new("lexer").version("1.0").author("Nagendra Kumar Jamadagni")
+    let args = Command::new("lexer")
+                        .version("1.0")
+                        .author("Nagendra Kumar Jamadagni")
                         .about("A sample lexer built from following Engineering a Compiler by Keith Cooper and Linda Torczan")
-                        .arg(Arg::new("microsyntax").short('r').value_name("[REGEX, SYNTACTIC CATEGORY]")
-                        .num_args(2).action(clap::ArgAction::Append).required(true).value_parser(clap::value_parser!(String))
-                        .help("Pair of regular expression and syntactic category specified by the regex. Both must be provided"))
-                        .arg(Arg::new("save-nfa").short('n')
-                        .help("Save the NFA after Thompson Construction of the regex")
-                        .action(clap::ArgAction::SetTrue))
-                        .arg(Arg::new("save-minimal-dfa").short('m')
-                        .help("Save the minimal DFA after applying Hopcroft's Minimalization Algorithm")
-                        .action(clap::ArgAction::SetTrue))
-                        .arg(Arg::new("save-dfa").short('d')
-                        .help("Save the un-optimized DFA obtained after Subset Construction of NFA")
-                        .action(clap::ArgAction::SetTrue)).get_matches();
+                        .arg(
+                            Arg::new("microsyntax")
+                                .short('r')
+                                .value_name("[REGEX, SYNTACTIC CATEGORY]")
+                                .num_args(2)
+                                .action(clap::ArgAction::Append)
+                                .required(true)
+                                .value_parser(clap::value_parser!(String))
+                                .help("Pair of regular expression and syntactic category specified by the regex. Both must be provided")
+                        )
+                        .arg(
+                            Arg::new("save-nfa")
+                                .short('n')
+                                .help("Save the NFA after Thompson Construction of the regex")
+                                .action(clap::ArgAction::SetTrue))
+                                .arg(Arg::new("save-minimal-dfa")
+                                .short('m')
+                                .help("Save the minimal DFA after applying Hopcroft's Minimalization Algorithm")
+                                .action(clap::ArgAction::SetTrue)
+                        )
+                        .arg(
+                            Arg::new("save-dfa")
+                                .short('d')
+                                .help("Save the un-optimized DFA obtained after Subset Construction of NFA")
+                                .action(clap::ArgAction::SetTrue)
+                        )
+                        .get_matches();
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
 
