@@ -504,8 +504,5 @@ pub fn construct_nfa(
         result.show_fa(&filename);
     }
 
-    for state in result.get_states() {
-        println!("The state is {:?}", state);
-    }
     result
 }

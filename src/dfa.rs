@@ -216,7 +216,6 @@ impl DFAState {
     }
 
     fn set_category(&mut self, category: String) {
-        println!("The category is being set for state {:?}", self.id);
         self.category = category;
     }
 
@@ -640,7 +639,6 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
         for state in q0.iter_ones() {
             let category = nfa.get_state(state).get_category();
             if !category.is_empty() {
-                println!("The category being set is {:?}", category);
                 result.set_accept_category(category);
             }
         }
@@ -672,7 +670,6 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
                     for state in t.iter_ones() {
                         let category = nfa.get_state(state).get_category();
                         if !category.is_empty() {
-                            println!("The category being set is {:?}", category);
                             result.set_accept_category(category);
                         }
                     }
@@ -701,8 +698,5 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
         result.show_fa(&filename);
     }
 
-    for state in result.get_states() {
-        println!("The state is {:?}", state);
-    }
     return result;
 }

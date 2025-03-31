@@ -44,11 +44,6 @@ fn main() {
 
     let save_minimal_dfa = args.get_flag("save-minimal-dfa");
 
-    println!(
-        "The flags are {:?} {:?} {:?}",
-        save_nfa, save_dfa, save_minimal_dfa
-    );
-
     let mut syntax_tree_list: VecDeque<(String, RegEx, String)> = VecDeque::new();
 
     while !regex_list.is_empty() {
