@@ -54,8 +54,6 @@ impl Scanner {
 
         let num_classes = hash_to_class_map.len();
 
-        println!("The number of classes is {:?}", hash_to_class_map.len());
-
         for _ in 0..num_rows {
             let mut column_vec: Vec<usize> = Vec::new();
             for _ in 0..num_classes {
@@ -74,7 +72,6 @@ impl Scanner {
                 self.transition_table[row_id][*class_id] = destination;
             }
         }
-        println!("The classifier table is {:?}", self.classifier_table);
     }
 
     fn init_transition_table(&mut self, dfa: &DFA) {
@@ -134,6 +131,22 @@ impl Scanner {
             println!("");
         }
     }
+
+    fn init_token_type_table(&mut self, dfa: &DFA) {
+        let accept_states = dfa.get_acceptor_states();
+
+        for accept_state in accept_states.iter_ones() {
+            let category = dfa.get_state(accept_state).get_category();
+            self.token_type_table
+                .insert(accept_state, category.to_string());
+        }
+    }
+
+    fn print_token_type_table(&self) {
+        for (id, category) in self.token_type_table.iter() {
+            println!("The category for accept state {:?} is {:?}", id, category);
+        }
+    }
 }
 
 pub fn construct_scanner(dfa: &DFA) {
@@ -141,5 +154,9 @@ pub fn construct_scanner(dfa: &DFA) {
 
     scanner.init_transition_table(dfa);
 
+    scanner.init_token_type_table(dfa);
+
     scanner.print_transition_table();
+
+    scanner.print_token_type_table();
 }

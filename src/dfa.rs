@@ -219,7 +219,7 @@ impl DFAState {
         self.category = category;
     }
 
-    fn get_category(&self) -> &String {
+    pub fn get_category(&self) -> &String {
         &self.category
     }
 }
