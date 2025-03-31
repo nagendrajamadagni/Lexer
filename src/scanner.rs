@@ -4,21 +4,23 @@
 
 use crate::dfa::DFA;
 use crate::fa::{Symbol, FA};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 struct Scanner {
     transition_table: Vec<Vec<usize>>, // Matrix of input characters and dfa states
     classifier_table: HashMap<Option<char>, usize>, // Mapping from alphabet to its class id
     token_type_table: HashMap<usize, String>, // Mapping of accept state number and token type
+    token_type_priority_list: VecDeque<String>, // Priority list for different token types
 }
 
 impl Scanner {
-    fn new() -> Self {
+    fn new(token_type_priority_list: VecDeque<String>) -> Self {
         Scanner {
             transition_table: vec![],
             classifier_table: HashMap::new(),
             token_type_table: HashMap::new(),
+            token_type_priority_list,
         }
     }
 
@@ -147,10 +149,16 @@ impl Scanner {
             println!("The category for accept state {:?} is {:?}", id, category);
         }
     }
+
+    fn print_priority_list(&self) {
+        for token_type in self.token_type_priority_list.iter() {
+            println!("{:?}", token_type);
+        }
+    }
 }
 
-pub fn construct_scanner(dfa: &DFA) {
-    let mut scanner = Scanner::new();
+pub fn construct_scanner(dfa: &DFA, token_type_priority_list: VecDeque<String>) {
+    let mut scanner = Scanner::new(token_type_priority_list);
 
     scanner.init_transition_table(dfa);
 
@@ -159,4 +167,6 @@ pub fn construct_scanner(dfa: &DFA) {
     scanner.print_transition_table();
 
     scanner.print_token_type_table();
+
+    scanner.print_priority_list();
 }

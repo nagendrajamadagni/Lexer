@@ -26,6 +26,8 @@ fn main() {
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
 
+    let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
+
     if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
             let value_vec: Vec<_> = value_group.collect();
@@ -35,6 +37,8 @@ fn main() {
             } else {
                 panic!("Both regex and syntactic category should be provided");
             }
+
+            token_type_priority_list.push_back(value_vec[1].clone());
         }
     }
 
@@ -59,5 +63,5 @@ fn main() {
     let dfa = dfa::construct_dfa(nfa, save_dfa);
     let dfa = dfa::construct_minimal_dfa(dfa, save_minimal_dfa);
 
-    scanner::construct_scanner(&dfa);
+    scanner::construct_scanner(&dfa, token_type_priority_list);
 }
