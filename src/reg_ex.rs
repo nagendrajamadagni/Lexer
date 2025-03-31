@@ -85,8 +85,18 @@ fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
             }
             new_start = new_start + 3;
         } else {
-            char_set.insert(regex.chars().nth(new_start).unwrap());
-            new_start = new_start + 1;
+            if regex.chars().nth(new_start).unwrap() == '\\' {
+                match regex.chars().nth(new_start + 1).unwrap() {
+                    'n' => char_set.insert('\n'),
+                    't' => char_set.insert('\t'),
+                    '\\' => char_set.insert('\\'),
+                    _ => panic!("Invalid escape character provided"),
+                };
+                new_start = new_start + 2;
+            } else {
+                char_set.insert(regex.chars().nth(new_start).unwrap());
+                new_start = new_start + 1;
+            }
         }
     }
 

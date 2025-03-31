@@ -385,6 +385,26 @@ impl NFA {
         return result;
     }
 
+    fn escape_literal_construction(character: char) -> NFA {
+        let mut result: NFA = NFA::new();
+        let start_state = result.add_state();
+        let end_state = result.add_state();
+
+        let escape_character = match character {
+            'n' => '\n',
+            't' => '\t',
+            '\\' => '\\',
+            _ => panic!("Invalid escape cahracter found!"),
+        };
+
+        result.add_alphabet(escape_character);
+        result.add_transition(start_state, Symbol::Char(escape_character), end_state);
+
+        result.set_start_state(start_state);
+        result.set_accept_state(end_state);
+        return result;
+    }
+
     pub fn get_state(&self, id: usize) -> &NFAState {
         let state = self.states.get(id);
         match state {
@@ -425,7 +445,7 @@ impl NFA {
 fn parse_base_tree(tree: Base) -> NFA {
     match tree {
         Base::Character(character) => NFA::literal_construction(character),
-        Base::EscapeCharacter(character) => NFA::literal_construction(character),
+        Base::EscapeCharacter(character) => NFA::escape_literal_construction(character),
         Base::Exp(regex) => {
             let regex = *regex;
             parse_regex_tree(regex)
