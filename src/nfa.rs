@@ -393,6 +393,7 @@ impl NFA {
         let escape_character = match character {
             'n' => '\n',
             't' => '\t',
+            'r' => '\r',
             '\\' => '\\',
             _ => panic!("Invalid escape cahracter found!"),
         };
