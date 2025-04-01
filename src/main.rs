@@ -1,12 +1,53 @@
 use crate::reg_ex::RegEx;
 use clap::{Arg, Command};
 use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
+use std::path::PathBuf;
 
 mod dfa;
 mod fa;
 mod nfa;
 mod reg_ex;
 mod scanner;
+
+fn read_microsyntax_file(
+    file_path: PathBuf,
+) -> io::Result<(VecDeque<(String, String)>, VecDeque<String>)> {
+    let file = File::open(file_path);
+    let file = match file {
+        Ok(file) => file,
+        Err(error) => panic!("Error: Failed to open the microsyntax file {:?}", error),
+    };
+    let reader = BufReader::new(file);
+
+    let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
+
+    let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
+
+    for (line_number, line) in reader.lines().enumerate() {
+        let line = match line {
+            Ok(line) => line,
+            Err(error) => panic!(
+                "Error: Failed to read line number {:?} in microsyntaxes file! {:?}",
+                line_number, error
+            ),
+        };
+
+        let content: Vec<&str> = line.split_whitespace().collect();
+
+        if content.len() != 2 {
+            panic!("Error: Malformed microsyntax file! Each file should contain only 2 whitespace separated values, the regex and the syntactic category described by the regex")
+        }
+
+        let pair = (content[0].to_string(), content[1].to_string());
+        regex_list.push_back(pair);
+
+        token_type_priority_list.push_back(content[1].to_string());
+    }
+
+    Ok((regex_list, token_type_priority_list))
+}
 
 fn main() {
     let args = Command::new("lexer")
@@ -19,7 +60,6 @@ fn main() {
                                 .value_name("[REGEX, SYNTACTIC CATEGORY]")
                                 .num_args(2)
                                 .action(clap::ArgAction::Append)
-                                .required(true)
                                 .value_parser(clap::value_parser!(String))
                                 .help("Pair of regular expression and syntactic category specified by the regex. Both must be provided")
                         )
@@ -39,24 +79,44 @@ fn main() {
                                 .help("Save the un-optimized DFA obtained after Subset Construction of NFA")
                                 .action(clap::ArgAction::SetTrue)
                         )
+                        .arg(
+                            Arg::new("microsyntax-file")
+                                .short('f')
+                                .help("Provide a file with a list of regular expressions and the corresponsing syntactic category name. The order of the list determines the priority of the regular expressions during token scanning")
+                                .value_name("MICROSYNTAX FILE")
+                                .value_parser(clap::value_parser!(PathBuf))
+                        )
                         .get_matches();
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
 
     let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
 
-    if let Some(values) = args.get_occurrences::<String>("microsyntax") {
+    if let Some(file_path) = args.get_one::<PathBuf>("microsyntax-file") {
+        if file_path.exists() {
+            let (rlist, plist) = match read_microsyntax_file(file_path.to_path_buf()) {
+                Ok((rlist, plist)) => (rlist, plist),
+                Err(error) => panic!("Error reading the microsyntax file {:?}", error),
+            };
+            regex_list = rlist;
+            token_type_priority_list = plist;
+        } else {
+            panic!("Error: Provided file does not exist!");
+        }
+    } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
             let value_vec: Vec<_> = value_group.collect();
 
             if value_vec.len() == 2 {
                 regex_list.push_back((value_vec[0].clone(), value_vec[1].clone()));
             } else {
-                panic!("Both regex and syntactic category should be provided");
+                panic!("Error: Both regex and syntactic category should be provided");
             }
 
             token_type_priority_list.push_back(value_vec[1].clone());
         }
+    } else {
+        panic!("Error: Either a microsyntax file or a list of microsyntaxes should be provided!");
     }
 
     let save_nfa = args.get_flag("save-nfa");
