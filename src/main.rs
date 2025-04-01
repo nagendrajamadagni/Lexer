@@ -11,6 +11,31 @@ mod nfa;
 mod reg_ex;
 mod scanner;
 
+fn read_program_source_file(file_path: PathBuf) -> io::Result<Vec<String>> {
+    let file = File::open(file_path);
+    let file = match file {
+        Ok(file) => file,
+        Err(error) => panic!("Error: Failed to open the program source file {:?}", error),
+    };
+
+    let reader = BufReader::new(file);
+
+    let mut contents: Vec<String> = Vec::new();
+
+    for (line_number, line) in reader.lines().enumerate() {
+        let line = match line {
+            Ok(line) => line,
+            Err(error) => panic!(
+                "Error: Failed to read line number {:?} in the program source file! {:?}",
+                line_number, error
+            ),
+        };
+        contents.push(line);
+    }
+
+    Ok(contents)
+}
+
 fn read_microsyntax_file(
     file_path: PathBuf,
 ) -> io::Result<(VecDeque<(String, String)>, VecDeque<String>)> {
@@ -86,6 +111,14 @@ fn main() {
                                 .value_name("MICROSYNTAX FILE")
                                 .value_parser(clap::value_parser!(PathBuf))
                         )
+                        .arg(
+                            Arg::new("input")
+                            .short('i')
+                            .help("The program source file which should be scanned and tokenized")
+                            .value_name("INPUT SOURCE FILE")
+                            .value_parser(clap::value_parser!(PathBuf))
+                            .required(true)
+                        )
                         .get_matches();
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
@@ -117,6 +150,18 @@ fn main() {
         }
     } else {
         panic!("Error: Either a microsyntax file or a list of microsyntaxes should be provided!");
+    }
+
+    if let Some(file_path) = args.get_one::<PathBuf>("input") {
+        if file_path.exists() {
+            let content = match read_program_source_file(file_path.to_path_buf()) {
+                Ok(content) => content,
+                Err(error) => panic!("Error reading the program source file {:?}", error),
+            };
+            println!("The contents of the program file is {:?}", content);
+        } else {
+            panic!("Error: Invalid program source file provided!");
+        }
     }
 
     let save_nfa = args.get_flag("save-nfa");
