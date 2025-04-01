@@ -5,7 +5,68 @@
 use crate::dfa::DFA;
 use crate::fa::{Symbol, FA};
 use std::collections::{HashMap, VecDeque};
+use std::fs::File;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::io::{BufReader, Read};
+use std::path::PathBuf;
+struct Buffer {
+    source_buffer: [u8; 1024],
+    input_ptr: usize,
+    fence: usize,
+    buf_reader: BufReader<File>,
+}
+
+impl Buffer {
+    fn new(file_path: PathBuf) -> Self {
+        let file = match File::open(file_path) {
+            Ok(file) => file,
+            Err(error) => panic!("Error: Could not open the file {:?}", error),
+        };
+
+        let buf_reader = BufReader::new(file);
+        let mut buffer = Buffer {
+            input_ptr: 0,
+            fence: 0,
+            source_buffer: [0; 1024],
+            buf_reader,
+        };
+
+        buffer.fill_buffer(0, buffer.source_buffer.len() / 2);
+        return buffer;
+    }
+
+    fn fill_buffer(&mut self, start: usize, end: usize) {
+        assert!(end > start);
+        assert!(end - start == self.source_buffer.len() / 2);
+        let _ = match self.buf_reader.read(&mut self.source_buffer[start..end]) {
+            Ok(pos) => pos,
+            Err(error) => panic!("Error: Failed to read bytes from file {:?}", error),
+        };
+    }
+
+    fn rollback(&mut self) {
+        if self.input_ptr == self.fence {
+            panic!("Error: Rollback failed!");
+        }
+
+        self.input_ptr = (self.input_ptr - 1) % self.source_buffer.len();
+    }
+
+    fn next_char(&mut self) -> char {
+        let ch = self.source_buffer[self.input_ptr];
+        let two_n = self.source_buffer.len();
+        let n = two_n / 2;
+
+        self.input_ptr = (self.input_ptr + 1) % two_n;
+
+        if self.input_ptr % n == 0 {
+            self.fill_buffer(self.input_ptr, self.input_ptr + n);
+            self.fence = (self.input_ptr + n) % two_n;
+        }
+
+        ch.try_into().unwrap()
+    }
+}
 
 struct Scanner {
     transition_table: Vec<Vec<usize>>, // Matrix of input characters and dfa states
@@ -157,16 +218,22 @@ impl Scanner {
     }
 }
 
-pub fn construct_scanner(dfa: &DFA, token_type_priority_list: VecDeque<String>) {
+pub fn construct_scanner(
+    dfa: &DFA,
+    token_type_priority_list: VecDeque<String>,
+    source_file: PathBuf,
+) {
     let mut scanner = Scanner::new(token_type_priority_list);
 
     scanner.init_transition_table(dfa);
 
     scanner.init_token_type_table(dfa);
 
-    scanner.print_transition_table();
+    //scanner.print_transition_table();
 
-    scanner.print_token_type_table();
+    //scanner.print_token_type_table();
 
-    scanner.print_priority_list();
+    //scanner.print_priority_list();
+
+    let _buffer = Buffer::new(source_file);
 }

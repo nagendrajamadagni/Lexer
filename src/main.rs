@@ -11,31 +11,6 @@ mod nfa;
 mod reg_ex;
 mod scanner;
 
-fn read_program_source_file(file_path: PathBuf) -> io::Result<Vec<String>> {
-    let file = File::open(file_path);
-    let file = match file {
-        Ok(file) => file,
-        Err(error) => panic!("Error: Failed to open the program source file {:?}", error),
-    };
-
-    let reader = BufReader::new(file);
-
-    let mut contents: Vec<String> = Vec::new();
-
-    for (line_number, line) in reader.lines().enumerate() {
-        let line = match line {
-            Ok(line) => line,
-            Err(error) => panic!(
-                "Error: Failed to read line number {:?} in the program source file! {:?}",
-                line_number, error
-            ),
-        };
-        contents.push(line);
-    }
-
-    Ok(contents)
-}
-
 fn read_microsyntax_file(
     file_path: PathBuf,
 ) -> io::Result<(VecDeque<(String, String)>, VecDeque<String>)> {
@@ -125,9 +100,9 @@ fn main() {
 
     let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
 
-    if let Some(file_path) = args.get_one::<PathBuf>("microsyntax-file") {
-        if file_path.exists() {
-            let (rlist, plist) = match read_microsyntax_file(file_path.to_path_buf()) {
+    if let Some(mst_file_path) = args.get_one::<PathBuf>("microsyntax-file") {
+        if mst_file_path.exists() {
+            let (rlist, plist) = match read_microsyntax_file(mst_file_path.to_path_buf()) {
                 Ok((rlist, plist)) => (rlist, plist),
                 Err(error) => panic!("Error reading the microsyntax file {:?}", error),
             };
@@ -152,17 +127,10 @@ fn main() {
         panic!("Error: Either a microsyntax file or a list of microsyntaxes should be provided!");
     }
 
-    if let Some(file_path) = args.get_one::<PathBuf>("input") {
-        if file_path.exists() {
-            let content = match read_program_source_file(file_path.to_path_buf()) {
-                Ok(content) => content,
-                Err(error) => panic!("Error reading the program source file {:?}", error),
-            };
-            println!("The contents of the program file is {:?}", content);
-        } else {
-            panic!("Error: Invalid program source file provided!");
-        }
-    }
+    let src_file_path = match args.get_one::<PathBuf>("input") {
+        Some(file_path) => file_path,
+        None => panic!("Error: Input source file not provided!"),
+    };
 
     let save_nfa = args.get_flag("save-nfa");
 
@@ -185,5 +153,5 @@ fn main() {
     let dfa = dfa::construct_dfa(nfa, save_dfa);
     let dfa = dfa::construct_minimal_dfa(dfa, save_minimal_dfa);
 
-    scanner::construct_scanner(&dfa, token_type_priority_list);
+    scanner::construct_scanner(&dfa, token_type_priority_list, src_file_path.to_path_buf());
 }
