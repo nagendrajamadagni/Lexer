@@ -34,10 +34,10 @@ fn read_microsyntax_file(
             ),
         };
 
-        let content: Vec<&str> = line.split_whitespace().collect();
+        let content: Vec<&str> = line.split("::").collect();
 
         if content.len() != 2 {
-            panic!("Error: Malformed microsyntax file! Each file should contain only 2 whitespace separated values, the regex and the syntactic category described by the regex")
+            panic!("Error: Malformed microsyntax file! Each file should contain only 2 :: separated values, the regex and the syntactic category described by the regex")
         }
 
         let pair = (content[0].to_string(), content[1].to_string());
