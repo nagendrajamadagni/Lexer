@@ -395,6 +395,10 @@ impl NFA {
             't' => '\t',
             'r' => '\r',
             '\\' => '\\',
+            '(' => '(',
+            ')' => ')',
+            '[' => '[',
+            ']' => ']',
             _ => panic!("Invalid escape cahracter found!"),
         };
 
