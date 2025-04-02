@@ -37,8 +37,13 @@ pub enum RegEx {
 
 fn balanced_brackets(reg_ex: &str) -> bool {
     let mut stack = Vec::new();
+    let mut chars = reg_ex.chars().peekable();
 
-    for ch in reg_ex.chars() {
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            chars.next();
+            continue;
+        }
         match ch {
             '(' => {
                 stack.push(ch);
@@ -85,8 +90,23 @@ fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
             }
             new_start = new_start + 3;
         } else {
-            char_set.insert(regex.chars().nth(new_start).unwrap());
-            new_start = new_start + 1;
+            if regex.chars().nth(new_start).unwrap() == '\\' {
+                match regex.chars().nth(new_start + 1).unwrap() {
+                    'n' => char_set.insert('\n'),
+                    't' => char_set.insert('\t'),
+                    'r' => char_set.insert('\r'),
+                    '\\' => char_set.insert('\\'),
+                    'C' => char_set.insert('('),
+                    ')' => char_set.insert(')'),
+                    '[' => char_set.insert('['),
+                    ']' => char_set.insert(']'),
+                    _ => panic!("Invalid escape character provided"),
+                };
+                new_start = new_start + 2;
+            } else {
+                char_set.insert(regex.chars().nth(new_start).unwrap());
+                new_start = new_start + 1;
+            }
         }
     }
 
