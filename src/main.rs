@@ -102,12 +102,11 @@ fn main() {
 
     if let Some(mst_file_path) = args.get_one::<PathBuf>("microsyntax-file") {
         if mst_file_path.exists() {
-            let (rlist, plist) = match read_microsyntax_file(mst_file_path.to_path_buf()) {
+            let (rlist, _) = match read_microsyntax_file(mst_file_path.to_path_buf()) {
                 Ok((rlist, plist)) => (rlist, plist),
                 Err(error) => panic!("Error reading the microsyntax file {:?}", error),
             };
             regex_list = rlist;
-            token_type_priority_list = plist;
         } else {
             panic!("Error: Provided file does not exist!");
         }
@@ -153,5 +152,7 @@ fn main() {
     let dfa = dfa::construct_dfa(nfa, save_dfa);
     let dfa = dfa::construct_minimal_dfa(dfa, save_minimal_dfa);
 
-    scanner::construct_scanner(&dfa, token_type_priority_list, src_file_path.to_path_buf());
+    let scanner = scanner::construct_scanner(&dfa);
+
+    scanner.scan(src_file_path.to_path_buf());
 }
