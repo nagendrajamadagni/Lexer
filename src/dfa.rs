@@ -32,7 +32,6 @@ pub struct DFAState {
 struct LookupTable {
     state_to_set_map: HashMap<usize, usize>,
     set_to_states_map: HashMap<usize, HashSet<usize>>,
-    reduced_states: HashSet<usize>,
 }
 
 impl LookupTable {
@@ -40,16 +39,7 @@ impl LookupTable {
         LookupTable {
             state_to_set_map: HashMap::new(),
             set_to_states_map: HashMap::new(),
-            reduced_states: HashSet::new(),
         }
-    }
-
-    fn is_reduced(&self, state: &usize) -> bool {
-        self.reduced_states.contains(state)
-    }
-
-    fn reduce(&mut self, state: usize) {
-        self.reduced_states.insert(state);
     }
 
     fn insert_state_in_set(&mut self, state: usize, set: usize) {
@@ -344,11 +334,11 @@ fn compare_transitions(
         if !same_transitions {
             break;
         }
-        let state1_dest = state2_transitions.get(&Symbol::Char(*c)); // Get destination
+        let state1_dest = state1_transitions.get(&Symbol::Char(*c)); // Get destination
                                                                      // for the state for
                                                                      // this symbol and
                                                                      // member
-        let state2_dest = state1_transitions.get(&Symbol::Char(*c));
+        let state2_dest = state2_transitions.get(&Symbol::Char(*c));
 
         match (state1_dest, state2_dest) {
             (None, None) => same_transitions = true, // If both don't have a transition, no splitting
@@ -373,6 +363,7 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
     let alphabet = dfa.get_alphabet();
     let mut lookup_table = LookupTable::new();
     let states = dfa.get_acceptor_states();
+    let mut set_changes: VecDeque<(usize, usize)> = VecDeque::new();
     // 0 is non acceptors states, 1 is acceptor states
     // If all states are acceptor states, then 0 is the only set id
 
@@ -393,7 +384,6 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
         let offset_map_len = set_id + category_set_id.len();
 
         let insert_id = category_set_id
-            // Need to map categories to a set_id
             .entry(category.to_string())
             .or_insert(offset_map_len);
 
@@ -410,8 +400,6 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
         for set in sets.iter() {
             if set.len() == 1 {
                 // Cannot split a set with only 1 element
-                let singleton_element = set.iter().next().unwrap();
-                lookup_table.reduce(*singleton_element);
                 continue;
             }
             let next_set = lookup_table.get_num_sets(); // The next set which will be inserted
@@ -423,24 +411,17 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
 
             let member_state = dfa.get_state(*member_state_id);
 
-            let mut reduced = true; // Assume that the set will be reduced in this iteration
-
             for state_id in set {
-                if lookup_table.is_reduced(state_id) {
-                    continue;
-                }
                 let state = dfa.get_state(*state_id);
 
                 if !compare_transitions(state, member_state, alphabet, &lookup_table) {
-                    lookup_table.insert_state_in_set(*state_id, next_set);
-                    reduced = false;
+                    set_changes.push_back((*state_id, next_set));
                 }
             }
 
-            if reduced {
-                for state_id in set {
-                    lookup_table.reduce(*state_id);
-                }
+            while !set_changes.is_empty() {
+                let change = set_changes.pop_front().unwrap();
+                lookup_table.insert_state_in_set(change.0, change.1);
             }
         }
         let new_number_of_sets = lookup_table.get_num_sets();
@@ -450,6 +431,94 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
         }
     }
     return lookup_table;
+}
+fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
+    let mut result = DFA::new(); // Set up result DFA
+    let mut reorder_map = HashMap::new(); // Set up a re-order table
+    let mut stack: VecDeque<usize> = VecDeque::new(); // Set up a stack for DFS
+
+    let mut visited: BitVec<u8, Lsb0> = BitVec::repeat(false, dfa.get_num_states());
+
+    for _ in 0..dfa.get_num_states() {
+        // Add as many states as in the initial DFA because
+        // we are not adding or removing ant states, just
+        // re-ordering them.
+        result.add_state();
+    }
+    let dfa_start = dfa.get_start_state(); // Get the starting dfa state
+
+    let mut next_id = 0;
+
+    stack.push_front(dfa_start); // Add the start state to the stack
+
+    while !stack.is_empty() {
+        // Start DFS
+        let state_id = stack.pop_front().unwrap(); // Get the head of stack
+
+        if *visited.get(state_id).unwrap() {
+            // If node is already visited skip
+            continue;
+        }
+
+        visited.set(state_id, true); // Mark the current node as visited
+
+        let reorder_state_id = match reorder_map.get(&state_id) {
+            Some(&id) => id,
+            None => {
+                reorder_map.insert(state_id, next_id);
+                let reordered_id = next_id;
+                next_id = next_id + 1;
+                reordered_id
+            }
+        }; // Get the re-ordered equivalent state or add one
+
+        let state = dfa.get_state(state_id); // Get the state from the dfa
+
+        let transitions = state.get_transitions(); // Get the transitions from the original state
+
+        let reorder_state: &mut DFAState = result.get_state_mut(reorder_state_id); // Get the state from the
+                                                                                   // re-ordered DFA
+
+        for transition in transitions {
+            // For each transition, check if the target state is
+            // present
+            let symbol = transition.0.clone();
+            let target = transition.1;
+
+            let reorder_target_id = match reorder_map.get(target) {
+                // If not present, take the next available state and map it to the current
+                // un-ordered state
+                Some(&id) => id,
+                None => {
+                    let state_id = next_id;
+                    reorder_map.insert(*target, state_id);
+                    next_id = next_id + 1; // Pick the next available id
+                    state_id
+                }
+            };
+
+            reorder_state.add_transition(symbol, reorder_target_id); // Add a transition from the
+                                                                     // reordered state to the
+                                                                     // reordered target
+            stack.push_front(*target); // Add the target to the head of the stack now
+        }
+    }
+
+    let start_state = dfa.get_start_state();
+
+    let reordered_start_state = reorder_map.get(&start_state).unwrap();
+    result.set_start_state(*reordered_start_state);
+
+    // Mark the acceptor states
+
+    for accept in dfa.get_acceptor_states().iter_ones() {
+        let remapped_id = reorder_map.get(&accept).unwrap();
+        let category = dfa.get_state(accept).get_category();
+        result.set_accept_state(*remapped_id);
+        result.set_accept_category(category);
+    }
+
+    return result;
 }
 
 pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
@@ -523,12 +592,17 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
 
     let regex = minimal_dfa.get_regex();
 
+    let mut result = reorder_minimal_dfa(&minimal_dfa);
+    result.set_alphabet(minimal_dfa.get_alphabet().clone());
+    result.set_regex(regex.to_string());
+
     if save_minimal_dfa {
         let filename = format!("{regex}_minimal_dfa");
-        minimal_dfa.show_fa(&filename);
+        result.show_fa(&filename);
     }
 
-    return minimal_dfa;
+    return result; // Need to return re-ordered dfa since scanne assumes 0 is start state and
+                   // states are ordered
 }
 
 pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
