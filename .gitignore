@@ -5,3 +5,4 @@
 *.cg
 *.out
 Cargo.lock
+*.lex
