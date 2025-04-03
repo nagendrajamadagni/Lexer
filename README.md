@@ -47,3 +47,12 @@ The different options as follows:
 add1|sub1|negate::KEYWORD
 <br>
 [a-z]+::LOWERCASE
+
+# Sample Output
+
+## Sample Output for a Valid Program
+
+![Output after scanning a valid program](./images/valid.png)
+
+## Sample Output for an Invalid Program
+![Output after scanning an invalid program](./images/invalid.png)
