@@ -9,7 +9,7 @@ use crate::fa::{Symbol, FA};
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::io::{self, BufReader, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
 struct Buffer {
@@ -203,6 +203,7 @@ impl Scanner {
         self.accept_states.push(false);
     }
     #[cfg(debug_assertions)]
+    #[allow(dead_code)]
     fn print_transition_table(&self) {
         for column_vec in self.transition_table.iter() {
             for target in column_vec {
@@ -219,12 +220,6 @@ impl Scanner {
             let category = dfa.get_state(accept_state).get_category();
             self.token_type_table
                 .insert(accept_state, category.to_string());
-        }
-    }
-    #[cfg(debug_assertions)]
-    fn print_token_type_table(&self) {
-        for (id, category) in self.token_type_table.iter() {
-            println!("The category for accept state {:?} is {:?}", id, category);
         }
     }
 
@@ -350,6 +345,7 @@ impl Scanner {
     }
 
     #[cfg(debug_assertions)]
+    #[allow(dead_code)]
     fn print_classifier_table(&self) {
         println!("{:?}", self.classifier_table);
     }
@@ -361,15 +357,6 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
     scanner.init_transition_table(dfa);
 
     scanner.init_token_type_table(dfa);
-
-    #[cfg(debug_assertions)]
-    {
-        scanner.print_transition_table();
-
-        scanner.print_token_type_table();
-
-        scanner.print_classifier_table();
-    }
 
     return scanner;
 }

@@ -147,8 +147,6 @@ fn main() {
         }
     };
 
-    println!("The out file path is {:?}", out_file_path.display());
-
     let save_nfa = args.get_flag("save-nfa");
 
     let save_dfa = args.get_flag("save-dfa");
