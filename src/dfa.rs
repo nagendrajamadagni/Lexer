@@ -32,7 +32,6 @@ pub struct DFAState {
 struct LookupTable {
     state_to_set_map: HashMap<usize, usize>,
     set_to_states_map: HashMap<usize, HashSet<usize>>,
-    reduced_states: HashSet<usize>,
 }
 
 impl LookupTable {
@@ -40,16 +39,7 @@ impl LookupTable {
         LookupTable {
             state_to_set_map: HashMap::new(),
             set_to_states_map: HashMap::new(),
-            reduced_states: HashSet::new(),
         }
-    }
-
-    fn is_reduced(&self, state: &usize) -> bool {
-        self.reduced_states.contains(state)
-    }
-
-    fn reduce(&mut self, state: usize) {
-        self.reduced_states.insert(state);
     }
 
     fn insert_state_in_set(&mut self, state: usize, set: usize) {
@@ -344,11 +334,11 @@ fn compare_transitions(
         if !same_transitions {
             break;
         }
-        let state1_dest = state2_transitions.get(&Symbol::Char(*c)); // Get destination
+        let state1_dest = state1_transitions.get(&Symbol::Char(*c)); // Get destination
                                                                      // for the state for
                                                                      // this symbol and
                                                                      // member
-        let state2_dest = state1_transitions.get(&Symbol::Char(*c));
+        let state2_dest = state2_transitions.get(&Symbol::Char(*c));
 
         match (state1_dest, state2_dest) {
             (None, None) => same_transitions = true, // If both don't have a transition, no splitting
@@ -373,6 +363,7 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
     let alphabet = dfa.get_alphabet();
     let mut lookup_table = LookupTable::new();
     let states = dfa.get_acceptor_states();
+    let mut set_changes: VecDeque<(usize, usize)> = VecDeque::new();
     // 0 is non acceptors states, 1 is acceptor states
     // If all states are acceptor states, then 0 is the only set id
 
@@ -393,11 +384,14 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
         let offset_map_len = set_id + category_set_id.len();
 
         let insert_id = category_set_id
-            // Need to map categories to a set_id
             .entry(category.to_string())
             .or_insert(offset_map_len);
 
         lookup_table.insert_state_in_set(accept_state, *insert_id);
+    }
+
+    for accept_state in states.iter_ones() {
+        lookup_table.insert_state_in_set(accept_state, set_id);
     }
 
     loop {
@@ -410,8 +404,6 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
         for set in sets.iter() {
             if set.len() == 1 {
                 // Cannot split a set with only 1 element
-                let singleton_element = set.iter().next().unwrap();
-                lookup_table.reduce(*singleton_element);
                 continue;
             }
             let next_set = lookup_table.get_num_sets(); // The next set which will be inserted
@@ -423,24 +415,17 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
 
             let member_state = dfa.get_state(*member_state_id);
 
-            let mut reduced = true; // Assume that the set will be reduced in this iteration
-
             for state_id in set {
-                if lookup_table.is_reduced(state_id) {
-                    continue;
-                }
                 let state = dfa.get_state(*state_id);
 
                 if !compare_transitions(state, member_state, alphabet, &lookup_table) {
-                    lookup_table.insert_state_in_set(*state_id, next_set);
-                    reduced = false;
+                    set_changes.push_back((*state_id, next_set));
                 }
             }
 
-            if reduced {
-                for state_id in set {
-                    lookup_table.reduce(*state_id);
-                }
+            while !set_changes.is_empty() {
+                let change = set_changes.pop_front().unwrap();
+                lookup_table.insert_state_in_set(change.0, change.1);
             }
         }
         let new_number_of_sets = lookup_table.get_num_sets();
