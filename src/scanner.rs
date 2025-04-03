@@ -9,7 +9,7 @@ use crate::fa::{Symbol, FA};
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
 struct Buffer {
@@ -203,6 +203,7 @@ impl Scanner {
         self.accept_states.push(false);
     }
     #[cfg(debug_assertions)]
+    #[allow(dead_code)]
     fn print_transition_table(&self) {
         for column_vec in self.transition_table.iter() {
             for target in column_vec {
@@ -219,12 +220,6 @@ impl Scanner {
             let category = dfa.get_state(accept_state).get_category();
             self.token_type_table
                 .insert(accept_state, category.to_string());
-        }
-    }
-    #[cfg(debug_assertions)]
-    fn print_token_type_table(&self) {
-        for (id, category) in self.token_type_table.iter() {
-            println!("The category for accept state {:?} is {:?}", id, category);
         }
     }
 
@@ -292,7 +287,7 @@ impl Scanner {
 
         if last_accept_pos == -1 && last_accept_state == -1 {
             // We never found a good token return bad token
-            let error_string = format!("Bad token found! {:?}", lexeme);
+            let error_string = format!("Bad token found! {} is not a valid token", lexeme);
             Err(error_string)
         } else {
             // Truncate lexeme to last_accept_pos size
@@ -327,17 +322,30 @@ impl Scanner {
         }
     }
 
-    pub fn scan(&self, source_file: PathBuf) {
+    pub fn scan(&self, source_file: PathBuf, out_file: PathBuf) {
         let mut buffer = Buffer::new(source_file);
 
-        while !buffer.is_eof() {
-            let next_word = self.next_word(&mut buffer);
+        let mut out_file = match File::create(out_file) {
+            Ok(file) => file,
+            Err(error) => panic!("Could not create output file! {}", error),
+        };
 
-            println!("The next word is {:?}", next_word);
+        while !buffer.is_eof() {
+            let next_word = match self.next_word(&mut buffer) {
+                Err(error) => panic!("{}", error),
+                Ok(next_word) => next_word,
+            };
+
+            let output_line = format!("({:?}, {})", next_word.0, next_word.1);
+            let _ = match writeln!(out_file, "{}", output_line) {
+                Err(_) => panic!("Failed to write to output file!"),
+                Ok(_) => {}
+            };
         }
     }
 
     #[cfg(debug_assertions)]
+    #[allow(dead_code)]
     fn print_classifier_table(&self) {
         println!("{:?}", self.classifier_table);
     }
@@ -349,15 +357,6 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
     scanner.init_transition_table(dfa);
 
     scanner.init_token_type_table(dfa);
-
-    #[cfg(debug_assertions)]
-    {
-        scanner.print_transition_table();
-
-        scanner.print_token_type_table();
-
-        scanner.print_classifier_table();
-    }
 
     return scanner;
 }
