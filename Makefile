@@ -8,3 +8,4 @@ run:
 .PHONY clean:
 	rm -f *.jpg
 	rm -f *.dot
+	rm -f *.lex
