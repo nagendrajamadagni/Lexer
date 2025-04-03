@@ -524,8 +524,7 @@ pub fn construct_nfa(
         result.set_regex(new_regex);
     }
     if save_nfa {
-        let regex = result.get_regex();
-        let filename = format!("{regex}_nfa");
+        let filename = format!("constructed_nfa");
         result.show_fa(&filename);
     }
 
