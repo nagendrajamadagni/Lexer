@@ -94,6 +94,13 @@ fn main() {
                             .value_parser(clap::value_parser!(PathBuf))
                             .required(true)
                         )
+                        .arg(
+                            Arg::new("output")
+                            .short('o')
+                            .help("The output file to store the lexer's output")
+                            .value_name("OUTPUT RESULT FILE")
+                            .value_parser(clap::value_parser!(PathBuf))
+                        )
                         .get_matches();
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
@@ -131,6 +138,17 @@ fn main() {
         None => panic!("Error: Input source file not provided!"),
     };
 
+    let out_file_path = match args.get_one::<PathBuf>("output") {
+        Some(file_path) => file_path,
+        None => {
+            let in_file_stem = src_file_path.file_stem().unwrap().to_str().unwrap();
+            let out_file_name = format!("{in_file_stem}.lex");
+            &PathBuf::from(out_file_name)
+        }
+    };
+
+    println!("The out file path is {:?}", out_file_path.display());
+
     let save_nfa = args.get_flag("save-nfa");
 
     let save_dfa = args.get_flag("save-dfa");
@@ -154,5 +172,5 @@ fn main() {
 
     let scanner = scanner::construct_scanner(&dfa);
 
-    scanner.scan(src_file_path.to_path_buf());
+    scanner.scan(src_file_path.to_path_buf(), out_file_path.to_path_buf());
 }
