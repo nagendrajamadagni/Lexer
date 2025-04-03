@@ -56,3 +56,12 @@ add1|sub1|negate::KEYWORD
 
 ## Sample Output for an Invalid Program
 ![Output after scanning an invalid program](./images/invalid.png)
+
+## Sample NFA
+![Sample NFA file](./images/constructed_nfa.jpg)
+
+## Sample DFA
+![Sample DFA file](./images/constructed_dfa.jpg)
+
+## Sample Minimal DFA
+![Sample Minimized DFA file](./images/constructed_minimal_dfa.jpg)
