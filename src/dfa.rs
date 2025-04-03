@@ -390,10 +390,6 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
         lookup_table.insert_state_in_set(accept_state, *insert_id);
     }
 
-    for accept_state in states.iter_ones() {
-        lookup_table.insert_state_in_set(accept_state, set_id);
-    }
-
     loop {
         let number_of_sets = lookup_table.get_num_sets(); // Get number of sets at start of
                                                           // iteration
@@ -605,7 +601,8 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
         result.show_fa(&filename);
     }
 
-    return result;
+    return result; // Need to return re-ordered dfa since scanne assumes 0 is start state and
+                   // states are ordered
 }
 
 pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
