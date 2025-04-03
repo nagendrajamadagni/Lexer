@@ -436,6 +436,94 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
     }
     return lookup_table;
 }
+fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
+    let mut result = DFA::new(); // Set up result DFA
+    let mut reorder_map = HashMap::new(); // Set up a re-order table
+    let mut stack: VecDeque<usize> = VecDeque::new(); // Set up a stack for DFS
+
+    let mut visited: BitVec<u8, Lsb0> = BitVec::repeat(false, dfa.get_num_states());
+
+    for _ in 0..dfa.get_num_states() {
+        // Add as many states as in the initial DFA because
+        // we are not adding or removing ant states, just
+        // re-ordering them.
+        result.add_state();
+    }
+    let dfa_start = dfa.get_start_state(); // Get the starting dfa state
+
+    let mut next_id = 0;
+
+    stack.push_front(dfa_start); // Add the start state to the stack
+
+    while !stack.is_empty() {
+        // Start DFS
+        let state_id = stack.pop_front().unwrap(); // Get the head of stack
+
+        if *visited.get(state_id).unwrap() {
+            // If node is already visited skip
+            continue;
+        }
+
+        visited.set(state_id, true); // Mark the current node as visited
+
+        let reorder_state_id = match reorder_map.get(&state_id) {
+            Some(&id) => id,
+            None => {
+                reorder_map.insert(state_id, next_id);
+                let reordered_id = next_id;
+                next_id = next_id + 1;
+                reordered_id
+            }
+        }; // Get the re-ordered equivalent state or add one
+
+        let state = dfa.get_state(state_id); // Get the state from the dfa
+
+        let transitions = state.get_transitions(); // Get the transitions from the original state
+
+        let reorder_state: &mut DFAState = result.get_state_mut(reorder_state_id); // Get the state from the
+                                                                                   // re-ordered DFA
+
+        for transition in transitions {
+            // For each transition, check if the target state is
+            // present
+            let symbol = transition.0.clone();
+            let target = transition.1;
+
+            let reorder_target_id = match reorder_map.get(target) {
+                // If not present, take the next available state and map it to the current
+                // un-ordered state
+                Some(&id) => id,
+                None => {
+                    let state_id = next_id;
+                    reorder_map.insert(*target, state_id);
+                    next_id = next_id + 1; // Pick the next available id
+                    state_id
+                }
+            };
+
+            reorder_state.add_transition(symbol, reorder_target_id); // Add a transition from the
+                                                                     // reordered state to the
+                                                                     // reordered target
+            stack.push_front(*target); // Add the target to the head of the stack now
+        }
+    }
+
+    let start_state = dfa.get_start_state();
+
+    let reordered_start_state = reorder_map.get(&start_state).unwrap();
+    result.set_start_state(*reordered_start_state);
+
+    // Mark the acceptor states
+
+    for accept in dfa.get_acceptor_states().iter_ones() {
+        let remapped_id = reorder_map.get(&accept).unwrap();
+        let category = dfa.get_state(accept).get_category();
+        result.set_accept_state(*remapped_id);
+        result.set_accept_category(category);
+    }
+
+    return result;
+}
 
 pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
     let lookup_table = get_lookup_table(&dfa);
@@ -508,12 +596,16 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
 
     let regex = minimal_dfa.get_regex();
 
+    let mut result = reorder_minimal_dfa(&minimal_dfa);
+    result.set_alphabet(minimal_dfa.get_alphabet().clone());
+    result.set_regex(regex.to_string());
+
     if save_minimal_dfa {
         let filename = format!("{regex}_minimal_dfa");
-        minimal_dfa.show_fa(&filename);
+        result.show_fa(&filename);
     }
 
-    return minimal_dfa;
+    return result;
 }
 
 pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
