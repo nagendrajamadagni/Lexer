@@ -492,7 +492,7 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
     return result;
 }
 
-pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
+pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
     let lookup_table = get_lookup_table(&dfa);
     let sets = lookup_table.set_to_states_map.values();
 
@@ -578,7 +578,7 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
                         // the DFA to be organized
 }
 
-pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
+pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     let mut result = DFA::new(); // Create new DFA
     result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
 

@@ -198,7 +198,7 @@ fn main() {
                 panic!("visualize should be one of NFA | DFA | MINIMAL")
             }
         }
-    }
+    };
 
     let mut syntax_tree_list: VecDeque<(String, RegEx, String)> = VecDeque::new();
 
@@ -212,8 +212,8 @@ fn main() {
 
     let nfa = nfa::construct_nfa(syntax_tree_list, save_nfa);
 
-    let dfa = dfa::construct_dfa(nfa, save_dfa);
-    let minimal_dfa = dfa::construct_minimal_dfa(dfa, save_minimal_dfa);
+    let dfa = dfa::construct_dfa(&nfa, save_dfa);
+    let minimal_dfa = dfa::construct_minimal_dfa(&dfa, save_minimal_dfa);
 
     let scanner = scanner::construct_scanner(&minimal_dfa);
 
