@@ -100,6 +100,14 @@ impl FA for DFA {
     fn get_acceptor_states(&self) -> &BitVec<u8> {
         &self.accept_states
     }
+
+    fn get_state_transitions(&self, state_id: usize) -> Vec<(&Symbol, &usize)> {
+        let mut transition_list: Vec<(&Symbol, &usize)> = Vec::new();
+        for transition in self.states[state_id].transitions.iter() {
+            transition_list.push(transition);
+        }
+        return transition_list;
+    }
 }
 
 impl DFAState {
