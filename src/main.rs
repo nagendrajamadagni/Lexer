@@ -101,6 +101,14 @@ fn main() {
                             .value_name("OUTPUT RESULT FILE")
                             .value_parser(clap::value_parser!(PathBuf))
                         )
+                        .arg(
+                            Arg::new("skip-whitespace")
+                            .short('w')
+                            .help("Instruct scanner to skip whitespaces if they are semantically meaningless in your language. On by default")
+                            .default_value("true")
+                            .value_parser(clap::value_parser!(bool))
+                            .num_args(1)
+                        )
                         .get_matches();
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
@@ -153,6 +161,11 @@ fn main() {
 
     let save_minimal_dfa = args.get_flag("save-minimal-dfa");
 
+    let skip_whitespace = args
+        .get_one::<bool>("skip-whitespace")
+        .copied()
+        .unwrap_or(true);
+
     let mut syntax_tree_list: VecDeque<(String, RegEx, String)> = VecDeque::new();
 
     while !regex_list.is_empty() {
@@ -170,5 +183,9 @@ fn main() {
 
     let scanner = scanner::construct_scanner(&dfa);
 
-    scanner.scan(src_file_path.to_path_buf(), out_file_path.to_path_buf());
+    scanner.scan(
+        src_file_path.to_path_buf(),
+        out_file_path.to_path_buf(),
+        skip_whitespace,
+    );
 }
