@@ -83,6 +83,7 @@ pub struct Scanner {
     token_type_table: HashMap<usize, String>, // Mapping of accept state number and token type
     error_state: usize,
     accept_states: BitVec<u8>,
+    start_state: usize,
 }
 
 impl Scanner {
@@ -93,6 +94,7 @@ impl Scanner {
             token_type_table: HashMap::new(),
             error_state: 0,
             accept_states: BitVec::new(),
+            start_state: 0,
         }
     }
 
@@ -198,12 +200,14 @@ impl Scanner {
 
         self.error_state = num_states;
 
+        self.start_state = dfa.get_start_state();
+
         self.accept_states = dfa.get_acceptor_states().clone();
 
         self.accept_states.push(false);
     }
-    #[cfg(debug_assertions)]
     #[allow(dead_code)]
+    #[cfg(debug_assertions)]
     fn print_transition_table(&self) {
         for column_vec in self.transition_table.iter() {
             for target in column_vec {
@@ -224,7 +228,7 @@ impl Scanner {
     }
 
     fn next_word(&self, buffer: &mut Buffer) -> Result<(String, String), String> {
-        let mut state = 0; // Keeps track of the current state in the DFA
+        let mut state = self.start_state; // Keeps track of the current state in the DFA
         let mut lexeme = String::new();
         let mut stack: VecDeque<(usize, usize)> = VecDeque::new(); // Stack to back track after
                                                                    // overshooting the lexeme's
@@ -344,8 +348,8 @@ impl Scanner {
         }
     }
 
-    #[cfg(debug_assertions)]
     #[allow(dead_code)]
+    #[cfg(debug_assertions)]
     fn print_classifier_table(&self) {
         println!("{:?}", self.classifier_table);
     }
