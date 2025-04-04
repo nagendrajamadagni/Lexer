@@ -7,7 +7,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
 
-use crate::fa::{FAState, Symbol, FA};
+use crate::fa::{Symbol, FA};
 use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -33,6 +33,10 @@ impl Hash for NFAState {
 }
 
 impl FA for NFA {
+    fn add_alphabet(&mut self, _ch: char) {
+        todo!();
+    }
+
     fn show_fa(&self, filename: &str) {
         let mut graph = DiGraph::new();
         let mut node_map = std::collections::HashMap::new();
@@ -58,8 +62,8 @@ impl FA for NFA {
 
         // Mark Start and Accept States
 
-        let start_node = node_map[&self.get_start_state()];
-        graph[start_node] = format!("Start\nState {}", self.get_start_state());
+        let start_node = node_map[&self.start_state];
+        graph[start_node] = format!("Start\nState {}", self.start_state);
 
         let accept_states: Vec<usize> = self.accept_states.iter_ones().collect();
 
@@ -87,7 +91,11 @@ impl FA for NFA {
     }
 
     fn add_transition(&mut self, from: usize, symbol: Symbol, to: usize) {
-        self.states[from].add_transition(symbol, to);
+        self.states[from]
+            .transitions
+            .entry(symbol)
+            .or_default()
+            .insert(to);
     }
 
     fn set_accept_state(&mut self, state_id: usize) {
@@ -99,7 +107,7 @@ impl FA for NFA {
     }
 
     fn add_state(&mut self) -> usize {
-        let state_id = self.get_num_states();
+        let state_id = self.states.len();
         let new_state: NFAState = NFAState::new(state_id);
         self.states.push(new_state);
         self.accept_states.push(false);
@@ -129,16 +137,6 @@ impl FA for NFA {
     fn get_regex(&self) -> &String {
         return &self.regex;
     }
-
-    fn add_alphabet(&mut self, ch: char) {
-        self.alphabet.insert(ch);
-    }
-}
-
-impl FAState for NFAState {
-    fn add_transition(&mut self, symbol: Symbol, to: usize) {
-        self.transitions.entry(symbol).or_default().insert(to);
-    }
 }
 
 impl NFAState {
@@ -156,10 +154,6 @@ impl NFAState {
 
     pub fn get_id(&self) -> usize {
         return self.id;
-    }
-
-    fn set_category(&mut self, category: String) {
-        self.category = category;
     }
 
     pub fn get_category(&self) -> &String {
@@ -183,9 +177,9 @@ impl NFA {
         let new_start = result.add_state();
 
         // Copy states from NFA 1
-        let offset1 = result.get_num_states();
+        let offset1 = result.states.len();
 
-        for mut state in nfa1.get_states() {
+        for mut state in nfa1.states {
             state.id += offset1;
             let mut new_transitions = HashMap::new();
 
@@ -203,11 +197,16 @@ impl NFA {
         }
 
         // Add epsilon transition from new start to start state of NFA1
-        result.add_transition(new_start, Symbol::Epsilon, nfa1.get_start_state() + offset1);
 
-        let offset2 = result.get_num_states();
+        result.states[new_start]
+            .transitions
+            .entry(Symbol::Epsilon)
+            .or_default()
+            .insert(nfa1.start_state + offset1);
 
-        for mut state in nfa2.get_states() {
+        let offset2 = result.states.len();
+
+        for mut state in nfa2.states {
             // Copy states from NFA2
             state.id += offset2;
             let mut new_transitions = HashMap::new();
@@ -226,31 +225,39 @@ impl NFA {
         }
 
         // Add epsilon transition from new start to start state of NFA2
-        result.add_transition(new_start, Symbol::Epsilon, nfa2.get_start_state() + offset2);
+
+        result.states[new_start]
+            .transitions
+            .entry(Symbol::Epsilon)
+            .or_default()
+            .insert(nfa2.start_state + offset2);
 
         let new_accept = result.add_state();
 
         // Add epsilon transitions from NFA1s accept states to new accept
         let nfa1_accepts: Vec<usize> = nfa1.accept_states.iter_ones().collect();
         for accept_state in nfa1_accepts {
-            result.add_transition(accept_state + offset1, Symbol::Epsilon, new_accept);
+            result.states[accept_state + offset1]
+                .transitions
+                .entry(Symbol::Epsilon)
+                .or_default()
+                .insert(new_accept);
         }
 
         let nfa2_accepts: Vec<usize> = nfa2.accept_states.iter_ones().collect();
 
         // Add epsilon transitions from NFA2s accept states to new accept
         for accept_state in nfa2_accepts {
-            result.add_transition(accept_state + offset2, Symbol::Epsilon, new_accept);
+            result.states[accept_state + offset2]
+                .transitions
+                .entry(Symbol::Epsilon)
+                .or_default()
+                .insert(new_accept);
         }
 
-        result.set_start_state(new_start);
-        result.set_accept_state(new_accept);
-        result.set_alphabet(
-            nfa1.get_alphabet()
-                .union(&nfa2.get_alphabet())
-                .cloned()
-                .collect(),
-        );
+        result.start_state = new_start;
+        result.accept_states.set(new_accept, true);
+        result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
 
         return result;
     }
@@ -261,9 +268,9 @@ impl NFA {
 
         // Copy states from the original NFA
 
-        let offset = result.get_num_states();
+        let offset = result.states.len();
 
-        for mut state in nfa.get_states() {
+        for mut state in nfa.states {
             state.id += offset;
             let mut new_transitions = HashMap::new();
 
@@ -280,11 +287,11 @@ impl NFA {
             result.accept_states.push(false);
         }
 
-        result.add_transition(new_start, Symbol::Epsilon, nfa.get_start_state() + offset); // Add epsilon
-                                                                                           // transitions
-                                                                                           // from new
-                                                                                           // start to
-                                                                                           // old start
+        result.add_transition(new_start, Symbol::Epsilon, nfa.start_state + offset); // Add epsilon
+                                                                                     // transitions
+                                                                                     // from new
+                                                                                     // start to
+                                                                                     // old start
         let new_accept = result.add_state();
         match quantifier {
             Quantifier::Star | Quantifier::Question => {
@@ -313,22 +320,22 @@ impl NFA {
             result.add_transition(accept + offset, Symbol::Epsilon, new_accept);
         }
 
-        result.set_start_state(new_start); // Set new start and new accepts
-        result.set_accept_state(new_accept);
-        result.set_alphabet(nfa.get_alphabet().clone());
+        result.start_state = new_start;
+        result.accept_states.set(new_accept, true);
+        result.alphabet = nfa.alphabet;
         return result;
     }
 
     fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
         let mut result: NFA = NFA::new();
-        let offset = nfa1.get_num_states();
-        result.states = nfa1.get_states(); // Clone all states from nfa1
+        let offset = nfa1.states.len();
+        result.states = nfa1.states; // Clone all states from nfa1
         for _ in &nfa1.accept_states {
             result.accept_states.push(false);
         }
 
         // Add states and their transitions from nfa2 into the resultant nfa
-        for mut state in nfa2.get_states() {
+        for mut state in nfa2.states {
             // For each state in NFA2
             state.id += offset; // Change their ID by offset
             let mut new_transitions = HashMap::new(); // Create new transitions
@@ -351,11 +358,15 @@ impl NFA {
         let nfa1_accepts: Vec<usize> = nfa1.accept_states.iter_ones().collect();
 
         for accept_id in nfa1_accepts {
-            result.add_transition(accept_id, Symbol::Epsilon, nfa2.start_state + offset);
+            result.states[accept_id]
+                .transitions
+                .entry(Symbol::Epsilon)
+                .or_default()
+                .insert(nfa2.start_state + offset);
         }
 
-        result.set_start_state(nfa1.get_start_state()); // Make the start state of NFA1 the start state of
-                                                        // the result
+        result.start_state = nfa1.start_state; // Make the start state of NFA1 the start state of
+                                               // the result
         let nfa2_accepts: Vec<usize> = nfa2.accept_states.iter_ones().collect();
 
         let accept_states: Vec<usize> = nfa2_accepts.into_iter().map(|s| s + offset).collect(); // Make the accept states of NFA2 the accept
@@ -364,12 +375,7 @@ impl NFA {
             result.accept_states.set(accept, true);
         }
 
-        result.set_alphabet(
-            nfa1.get_alphabet()
-                .union(&nfa2.get_alphabet())
-                .cloned()
-                .collect(),
-        );
+        result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
         return result;
     }
 
@@ -377,11 +383,16 @@ impl NFA {
         let mut result: NFA = NFA::new();
         let start_state = result.add_state();
         let end_state = result.add_state();
-        result.add_alphabet(character);
-        result.add_transition(start_state, Symbol::Char(character), end_state);
 
-        result.set_start_state(start_state);
-        result.set_accept_state(end_state);
+        result.alphabet.insert(character);
+        result.states[start_state]
+            .transitions
+            .entry(Symbol::Char(character))
+            .or_default()
+            .insert(end_state);
+
+        result.start_state = start_state;
+        result.accept_states.set(end_state, true);
         return result;
     }
 
@@ -402,11 +413,16 @@ impl NFA {
             _ => panic!("Invalid escape cahracter found!"),
         };
 
-        result.add_alphabet(escape_character);
-        result.add_transition(start_state, Symbol::Char(escape_character), end_state);
+        result.alphabet.insert(escape_character);
+        result.states[start_state]
+            .transitions
+            .entry(Symbol::Char(escape_character))
+            .or_default()
+            .insert(end_state);
 
-        result.set_start_state(start_state);
-        result.set_accept_state(end_state);
+        result.start_state = start_state;
+        result.accept_states.set(end_state, true);
+
         return result;
     }
 
@@ -418,30 +434,17 @@ impl NFA {
         }
     }
 
-    fn get_mut_state(&mut self, id: usize) -> &mut NFAState {
-        let state = self.states.get_mut(id);
-        match state {
-            Some(state) => state,
-            None => panic!("Invalid state index provided"),
-        }
-    }
-
-    fn get_states(&self) -> Vec<NFAState> {
-        return self.states.clone();
-    }
-
-    fn set_regex(&mut self, regex: String) {
-        self.regex = regex;
-    }
-
     fn set_accept_category(&mut self, category: String) {
-        let accept_states = self.get_acceptor_states().clone();
+        let accept_states = self.accept_states.clone();
 
         for state in accept_states.iter_ones() {
-            let state = self.get_mut_state(state);
-            let old_category = state.get_category();
+            let state = match self.states.get_mut(state) {
+                Some(state) => state,
+                None => panic!("Invalid state index provided"),
+            };
+            let old_category = &state.category;
             if old_category.is_empty() {
-                state.set_category(category.clone());
+                state.category = category.clone();
             }
         }
     }
@@ -510,18 +513,19 @@ pub fn construct_nfa(
     let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
 
     let mut result = parse_regex_tree(syntax_tree);
-    result.set_regex(regex.to_string());
+    result.regex = regex.to_string();
+
     result.set_accept_category(category);
 
     while !syntax_tree_list.is_empty() {
         let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
         let mut nfa = parse_regex_tree(syntax_tree);
-        nfa.set_regex(regex.to_string());
+        nfa.regex = regex.to_string();
         nfa.set_accept_category(category);
-        let old_regex = result.get_regex().clone();
+        let old_regex = result.regex.clone();
         result = NFA::alternation(result, nfa);
         let new_regex = format!("{old_regex}|{regex}");
-        result.set_regex(new_regex);
+        result.regex = new_regex;
     }
     if save_nfa {
         let filename = format!("constructed_nfa");
