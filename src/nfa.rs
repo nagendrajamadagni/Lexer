@@ -33,10 +33,6 @@ impl Hash for NFAState {
 }
 
 impl FA for NFA {
-    fn add_alphabet(&mut self, _ch: char) {
-        todo!();
-    }
-
     fn show_fa(&self, filename: &str) {
         let mut graph = DiGraph::new();
         let mut node_map = std::collections::HashMap::new();

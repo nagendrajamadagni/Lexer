@@ -15,7 +15,6 @@ pub trait FA {
     fn get_num_states(&self) -> usize;
     fn get_start_state(&self) -> usize;
     fn get_alphabet(&self) -> &HashSet<char>;
-    fn add_alphabet(&mut self, ch: char);
     fn set_alphabet(&mut self, alphabet: HashSet<char>);
     fn get_acceptor_states(&self) -> &BitVec<u8>;
     fn get_regex(&self) -> &String;

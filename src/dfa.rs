@@ -180,10 +180,6 @@ impl FA for DFA {
     fn get_regex(&self) -> &String {
         &self.regex
     }
-
-    fn add_alphabet(&mut self, ch: char) {
-        self.alphabet.insert(ch);
-    }
 }
 
 impl FAState for DFAState {
