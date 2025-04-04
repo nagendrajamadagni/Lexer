@@ -73,3 +73,7 @@ add1|sub1|negate::KEYWORD
 
 ## Sample Minimal DFA
 ![Sample Minimized DFA file](./images/constructed_minimal_dfa.png)
+
+## Sample Visualization
+
+![Sample Visualization of FA](./images/fa_visualization.png)
