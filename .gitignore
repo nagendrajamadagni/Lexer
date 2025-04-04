@@ -8,3 +8,5 @@ Cargo.lock
 *.lex
 Dockerfile
 *.sh
+.DS_STORE
+*.gz
