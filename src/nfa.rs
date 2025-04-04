@@ -33,6 +33,54 @@ impl Hash for NFAState {
 }
 
 impl FA for NFA {
+    fn get_num_states(&self) -> usize {
+        self.states.len()
+    }
+
+    fn get_start_state(&self) -> usize {
+        self.start_state
+    }
+
+    fn get_alphabet(&self) -> &HashSet<char> {
+        return &self.alphabet;
+    }
+
+    fn get_acceptor_states(&self) -> &BitVec<u8> {
+        return &self.accept_states;
+    }
+}
+
+impl NFAState {
+    fn new(id: usize) -> Self {
+        NFAState {
+            id,
+            transitions: HashMap::new(),
+            category: String::new(),
+        }
+    }
+
+    pub fn get_transitions(&self) -> &HashMap<Symbol, HashSet<usize>> {
+        &self.transitions
+    }
+
+    pub fn get_id(&self) -> usize {
+        return self.id;
+    }
+
+    pub fn get_category(&self) -> &String {
+        &self.category
+    }
+}
+
+impl NFA {
+    fn add_state(&mut self) -> usize {
+        let state_id = self.states.len();
+        let new_state: NFAState = NFAState::new(state_id);
+        self.states.push(new_state);
+        self.accept_states.push(false);
+        return state_id;
+    }
+
     fn show_fa(&self, filename: &str) {
         let mut graph = DiGraph::new();
         let mut node_map = std::collections::HashMap::new();
@@ -86,54 +134,6 @@ impl FA for NFA {
         println!("NFA vizualization saved as {filename}.jpg");
     }
 
-    fn add_state(&mut self) -> usize {
-        let state_id = self.states.len();
-        let new_state: NFAState = NFAState::new(state_id);
-        self.states.push(new_state);
-        self.accept_states.push(false);
-        return state_id;
-    }
-
-    fn get_num_states(&self) -> usize {
-        self.states.len()
-    }
-
-    fn get_start_state(&self) -> usize {
-        self.start_state
-    }
-
-    fn get_alphabet(&self) -> &HashSet<char> {
-        return &self.alphabet;
-    }
-
-    fn get_acceptor_states(&self) -> &BitVec<u8> {
-        return &self.accept_states;
-    }
-}
-
-impl NFAState {
-    fn new(id: usize) -> Self {
-        NFAState {
-            id,
-            transitions: HashMap::new(),
-            category: String::new(),
-        }
-    }
-
-    pub fn get_transitions(&self) -> &HashMap<Symbol, HashSet<usize>> {
-        &self.transitions
-    }
-
-    pub fn get_id(&self) -> usize {
-        return self.id;
-    }
-
-    pub fn get_category(&self) -> &String {
-        &self.category
-    }
-}
-
-impl NFA {
     fn new() -> Self {
         NFA {
             states: Vec::new(),

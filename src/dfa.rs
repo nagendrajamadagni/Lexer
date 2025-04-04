@@ -85,6 +85,54 @@ impl LookupTable {
 }
 
 impl FA for DFA {
+    fn get_num_states(&self) -> usize {
+        self.states.len()
+    }
+
+    fn get_start_state(&self) -> usize {
+        self.start_state
+    }
+
+    fn get_alphabet(&self) -> &HashSet<char> {
+        &self.alphabet
+    }
+
+    fn get_acceptor_states(&self) -> &BitVec<u8> {
+        &self.accept_states
+    }
+}
+
+impl DFAState {
+    fn new(id: usize) -> Self {
+        DFAState {
+            id,
+            transitions: HashMap::new(),
+            category: String::new(),
+        }
+    }
+
+    pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
+        &self.transitions
+    }
+
+    fn set_category(&mut self, category: String) {
+        self.category = category;
+    }
+
+    pub fn get_category(&self) -> &String {
+        &self.category
+    }
+}
+
+impl DFA {
+    fn add_state(&mut self) -> usize {
+        let state_id = self.states.len();
+        let new_state: DFAState = DFAState::new(state_id);
+        self.states.push(new_state);
+        self.accept_states.push(false);
+        return state_id;
+    }
+
     fn show_fa(&self, filename: &str) {
         let mut graph = DiGraph::new();
         let mut node_map = std::collections::HashMap::new();
@@ -137,54 +185,6 @@ impl FA for DFA {
         println!("DFA vizualization saved as {}.jpg", filename);
     }
 
-    fn add_state(&mut self) -> usize {
-        let state_id = self.states.len();
-        let new_state: DFAState = DFAState::new(state_id);
-        self.states.push(new_state);
-        self.accept_states.push(false);
-        return state_id;
-    }
-
-    fn get_num_states(&self) -> usize {
-        self.states.len()
-    }
-
-    fn get_start_state(&self) -> usize {
-        self.start_state
-    }
-
-    fn get_alphabet(&self) -> &HashSet<char> {
-        &self.alphabet
-    }
-
-    fn get_acceptor_states(&self) -> &BitVec<u8> {
-        &self.accept_states
-    }
-}
-
-impl DFAState {
-    fn new(id: usize) -> Self {
-        DFAState {
-            id,
-            transitions: HashMap::new(),
-            category: String::new(),
-        }
-    }
-
-    pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
-        &self.transitions
-    }
-
-    fn set_category(&mut self, category: String) {
-        self.category = category;
-    }
-
-    pub fn get_category(&self) -> &String {
-        &self.category
-    }
-}
-
-impl DFA {
     fn new() -> Self {
         DFA {
             states: Vec::new(),
