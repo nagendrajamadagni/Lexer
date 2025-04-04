@@ -163,8 +163,7 @@ impl DFA {
 
         for accept in accept_states {
             let accept_node = node_map[&accept];
-            graph[accept_node] =
-                graph[accept_node].clone() + &format!("\nAccept\nState {}", accept);
+            graph[accept_node] = graph[accept_node].clone() + &format!("\nAccept");
         }
 
         let dot = Dot::new(&graph);
