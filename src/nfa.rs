@@ -48,6 +48,18 @@ impl FA for NFA {
     fn get_acceptor_states(&self) -> &BitVec<u8> {
         return &self.accept_states;
     }
+    fn get_state_transitions(&self, state_id: usize) -> Vec<(&Symbol, &usize)> {
+        let mut transition_list: Vec<(&Symbol, &usize)> = Vec::new();
+
+        for transition in self.states[state_id].transitions.iter() {
+            let symbol = transition.0;
+            for target in transition.1.iter() {
+                transition_list.push((symbol, target));
+            }
+        }
+
+        return transition_list;
+    }
 }
 
 impl NFAState {
