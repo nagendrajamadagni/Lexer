@@ -10,6 +10,7 @@ mod fa;
 mod nfa;
 mod reg_ex;
 mod scanner;
+mod visualizer;
 
 fn read_microsyntax_file(
     file_path: PathBuf,
