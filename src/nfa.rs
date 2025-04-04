@@ -113,7 +113,7 @@ impl NFA {
 
         for accept in accept_states {
             let accept_node = node_map[&accept];
-            graph[accept_node] = format!("Accept\nState {}", accept);
+            graph[accept_node] = format!("State {}\nAccept", accept);
         }
 
         let dot = Dot::new(&graph);
