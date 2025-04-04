@@ -57,6 +57,7 @@ fn main() {
                         .arg(
                             Arg::new("microsyntax")
                                 .short('r')
+                                .long("microsyntax")
                                 .value_name("[REGEX, SYNTACTIC CATEGORY]")
                                 .num_args(2)
                                 .action(clap::ArgAction::Append)
@@ -66,6 +67,7 @@ fn main() {
                         .arg(
                             Arg::new("save-nfa")
                                 .short('n')
+                                .long("save-nfa")
                                 .help("Save the NFA after Thompson Construction of the regex")
                                 .action(clap::ArgAction::SetTrue))
                                 .arg(Arg::new("save-minimal-dfa")
@@ -76,12 +78,14 @@ fn main() {
                         .arg(
                             Arg::new("save-dfa")
                                 .short('d')
+                                .long("save-dfa")
                                 .help("Save the un-optimized DFA obtained after Subset Construction of NFA")
                                 .action(clap::ArgAction::SetTrue)
                         )
                         .arg(
                             Arg::new("microsyntax-file")
                                 .short('f')
+                                .long("microsyntax-file")
                                 .help("Provide a file with a list of regular expressions and the corresponsing syntactic category name. The order of the list determines the priority of the regular expressions during token scanning")
                                 .value_name("MICROSYNTAX FILE")
                                 .value_parser(clap::value_parser!(PathBuf))
@@ -89,6 +93,7 @@ fn main() {
                         .arg(
                             Arg::new("input")
                             .short('i')
+                            .long("input")
                             .help("The program source file which should be scanned and tokenized")
                             .value_name("INPUT SOURCE FILE")
                             .value_parser(clap::value_parser!(PathBuf))
@@ -97,6 +102,7 @@ fn main() {
                         .arg(
                             Arg::new("output")
                             .short('o')
+                            .long("output")
                             .help("The output file to store the lexer's output")
                             .value_name("OUTPUT RESULT FILE")
                             .value_parser(clap::value_parser!(PathBuf))
@@ -104,6 +110,7 @@ fn main() {
                         .arg(
                             Arg::new("skip-whitespace")
                             .short('w')
+                            .long("skip-whitespace")
                             .help("Instruct scanner to skip whitespaces if they are semantically meaningless in your language. On by default")
                             .default_value("true")
                             .value_parser(clap::value_parser!(bool))
