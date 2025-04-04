@@ -11,4 +11,5 @@ pub trait FA {
     fn get_start_state(&self) -> usize;
     fn get_alphabet(&self) -> &HashSet<char>;
     fn get_acceptor_states(&self) -> &BitVec<u8>;
+    fn get_state_transitions(&self, id: usize) -> Vec<(&Symbol, &usize)>;
 }
