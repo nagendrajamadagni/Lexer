@@ -227,7 +227,11 @@ impl Scanner {
         }
     }
 
-    fn next_word(&self, buffer: &mut Buffer) -> Result<(String, String), String> {
+    fn next_word(
+        &self,
+        buffer: &mut Buffer,
+        skip_whitespace: bool,
+    ) -> Result<(String, String), String> {
         let mut state = self.start_state; // Keeps track of the current state in the DFA
         let mut lexeme = String::new();
         let mut stack: VecDeque<(usize, usize)> = VecDeque::new(); // Stack to back track after
@@ -256,6 +260,11 @@ impl Scanner {
             }
 
             let ch = buffer.next_char();
+
+            if skip_whitespace && ch.is_whitespace() {
+                // Come back here and fix it for string constatnts! @todo!()
+                continue;
+            }
 
             cur_pos = cur_pos + 1;
             lexeme.push(ch);
@@ -291,8 +300,7 @@ impl Scanner {
 
         if last_accept_pos == -1 && last_accept_state == -1 {
             // We never found a good token return bad token
-            let error_string = format!("Bad token found! {} is not a valid token", lexeme);
-            Err(error_string)
+            Err(lexeme)
         } else {
             // Truncate lexeme to last_accept_pos size
             // Rollback buffer by same number of characters
@@ -326,7 +334,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan(&self, source_file: PathBuf, out_file: PathBuf) {
+    pub fn scan(&self, source_file: PathBuf, out_file: PathBuf, skip_whitespace: bool) {
         let mut buffer = Buffer::new(source_file);
 
         let mut out_file = match File::create(out_file) {
@@ -335,8 +343,8 @@ impl Scanner {
         };
 
         while !buffer.is_eof() {
-            let next_word = match self.next_word(&mut buffer) {
-                Err(error) => panic!("{}", error),
+            let next_word = match self.next_word(&mut buffer, skip_whitespace) {
+                Err(error) => panic!("Bad token found! {} is not a valid token", error),
                 Ok(next_word) => next_word,
             };
 
