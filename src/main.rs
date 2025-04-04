@@ -117,6 +117,15 @@ fn main() {
                             .value_parser(clap::value_parser!(bool))
                             .num_args(1)
                         )
+                        .arg(
+                            Arg::new("visualize")
+                            .short('v')
+                            .long("visualize")
+                            .help("Visualize the finite automata graphs inside an interactive window that allows for zooming, panning and clicking of elements")
+                            .value_name("DFA, NFA, MINIMAL")
+                            .value_parser(clap::value_parser!(String))
+                            .num_args(1)
+                        )
                         .get_matches();
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
@@ -174,6 +183,23 @@ fn main() {
         .copied()
         .unwrap_or(true);
 
+    let visualize = args.get_one::<String>("visualize");
+
+    let visualize = match visualize {
+        None => "none",
+        Some(str) => {
+            if str.eq_ignore_ascii_case("nfa") {
+                "nfa"
+            } else if str.eq_ignore_ascii_case("dfa") {
+                "dfa"
+            } else if str.eq_ignore_ascii_case("minimal") {
+                "minimal"
+            } else {
+                panic!("visualize should be one of NFA | DFA | MINIMAL")
+            }
+        }
+    }
+
     let mut syntax_tree_list: VecDeque<(String, RegEx, String)> = VecDeque::new();
 
     while !regex_list.is_empty() {
@@ -187,13 +213,21 @@ fn main() {
     let nfa = nfa::construct_nfa(syntax_tree_list, save_nfa);
 
     let dfa = dfa::construct_dfa(nfa, save_dfa);
-    let dfa = dfa::construct_minimal_dfa(dfa, save_minimal_dfa);
+    let minimal_dfa = dfa::construct_minimal_dfa(dfa, save_minimal_dfa);
 
-    let scanner = scanner::construct_scanner(&dfa);
+    let scanner = scanner::construct_scanner(&minimal_dfa);
 
     scanner.scan(
         src_file_path.to_path_buf(),
         out_file_path.to_path_buf(),
         skip_whitespace,
     );
+
+    if visualize == "nfa" {
+        visualizer::visualize(&nfa);
+    } else if visualize == "dfa" {
+        visualizer::visualize(&dfa);
+    } else if visualize == "minimal" {
+        visualizer::visualize(&minimal_dfa);
+    }
 }
