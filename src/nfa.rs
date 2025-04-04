@@ -86,22 +86,6 @@ impl FA for NFA {
         println!("NFA vizualization saved as {filename}.jpg");
     }
 
-    fn add_transition(&mut self, from: usize, symbol: Symbol, to: usize) {
-        self.states[from]
-            .transitions
-            .entry(symbol)
-            .or_default()
-            .insert(to);
-    }
-
-    fn set_accept_state(&mut self, state_id: usize) {
-        self.accept_states.set(state_id, true);
-    }
-
-    fn set_start_state(&mut self, state_id: usize) {
-        self.start_state = state_id;
-    }
-
     fn add_state(&mut self) -> usize {
         let state_id = self.states.len();
         let new_state: NFAState = NFAState::new(state_id);
@@ -122,16 +106,8 @@ impl FA for NFA {
         return &self.alphabet;
     }
 
-    fn set_alphabet(&mut self, alphabet: HashSet<char>) {
-        self.alphabet = alphabet;
-    }
-
     fn get_acceptor_states(&self) -> &BitVec<u8> {
         return &self.accept_states;
-    }
-
-    fn get_regex(&self) -> &String {
-        return &self.regex;
     }
 }
 
@@ -282,18 +258,22 @@ impl NFA {
             result.states.push(state);
             result.accept_states.push(false);
         }
-
-        result.add_transition(new_start, Symbol::Epsilon, nfa.start_state + offset); // Add epsilon
-                                                                                     // transitions
-                                                                                     // from new
-                                                                                     // start to
-                                                                                     // old start
+        result.states[new_start]
+            .transitions
+            .entry(Symbol::Epsilon)
+            .or_default()
+            .insert(nfa.start_state + offset); // Add epsilon transitions from new start to old
+                                               // start
         let new_accept = result.add_state();
         match quantifier {
             Quantifier::Star | Quantifier::Question => {
-                result.add_transition(new_start, Symbol::Epsilon, new_accept); // Add epsilon transitions
-                                                                               // from new start to new
-                                                                               // accept state
+                // Add epsilon transitions from new start to new accept state
+
+                result.states[new_start]
+                    .transitions
+                    .entry(Symbol::Epsilon)
+                    .or_default()
+                    .insert(new_accept);
             }
             Quantifier::Plus => {}
         }
@@ -305,15 +285,20 @@ impl NFA {
             // and old accept and old start
             match quantifier {
                 Quantifier::Star | Quantifier::Plus => {
-                    result.add_transition(
-                        accept + offset,
-                        Symbol::Epsilon,
-                        nfa.start_state + offset,
-                    );
+                    result.states[accept + offset]
+                        .transitions
+                        .entry(Symbol::Epsilon)
+                        .or_default()
+                        .insert(nfa.start_state + offset);
                 }
                 _ => {}
             }
-            result.add_transition(accept + offset, Symbol::Epsilon, new_accept);
+
+            result.states[accept + offset]
+                .transitions
+                .entry(Symbol::Epsilon)
+                .or_default()
+                .insert(new_accept);
         }
 
         result.start_state = new_start;
@@ -443,6 +428,10 @@ impl NFA {
                 state.category = category.clone();
             }
         }
+    }
+
+    pub fn get_regex(&self) -> &String {
+        return &self.regex;
     }
 }
 
