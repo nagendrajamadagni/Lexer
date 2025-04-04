@@ -566,16 +566,16 @@ pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
 
     let regex = &minimal_dfa.regex;
 
+    let mut result = reorder_minimal_dfa(&minimal_dfa);
+    result.alphabet = minimal_dfa.alphabet.clone();
+    result.regex = regex.to_string();
+
     if save_minimal_dfa {
-        let mut result = reorder_minimal_dfa(&minimal_dfa);
-        result.alphabet = minimal_dfa.alphabet.clone();
-        result.regex = regex.to_string();
         let filename = format!("constructed_minimal_dfa");
         result.show_fa(&filename);
     }
 
-    return minimal_dfa; // We only need to re-arrange if we are saving, the scanner does not need
-                        // the DFA to be organized
+    return result; // We need to always reorder now as visualization is possible
 }
 
 pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
