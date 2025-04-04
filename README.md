@@ -40,6 +40,10 @@ The different options as follows:
 
 - --save-minimal-dfa [-m] : Save the minimal DFA created after applying Hopcroft's algorithm to the DFA created previously. The minimized DFA here still has different terminal states for different syntactic categories, hence this is not the smallest possible DFA that can be created. This is done to help with token identification later when scanning the input. The minimal DFA is again stored in `.dot` and `.jpg` file formats.
 
+<br>
+
+- --skip-whitespace [-w] : If spaces are semantically meaningless in your language, you can enable this option and the scanner will ignore any whitespace characters detected in the input stream, even if no whitespace syntactic category is defined in your microsyntax file. *CAUTION* Currently this detects whitespaces even inside string constants, this needs to be addressed at a later time.
+
 # Example microsyntax file
 
 [0-9]+::NUMBER
