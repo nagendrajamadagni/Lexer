@@ -243,6 +243,7 @@ impl Scanner {
 
         let mut failed_points: HashMap<(usize, usize), bool> = HashMap::new(); // Sparse matrix for memoization of failed states
                                                                                // for early exit during lexing.
+        let mut inside_string_constant = false;
 
         stack.push_front((state, cur_pos));
 
@@ -261,8 +262,13 @@ impl Scanner {
 
             let ch = buffer.next_char();
 
-            if skip_whitespace && ch.is_whitespace() {
-                // Come back here and fix it for string constatnts! @todo!()
+            if ch == '"' {
+                // If you encounter a double quote, toggle the fact that we are inside a
+                // string constant
+                inside_string_constant = !inside_string_constant;
+            }
+
+            if !inside_string_constant && skip_whitespace && ch.is_whitespace() {
                 continue;
             }
 
