@@ -184,6 +184,7 @@ fn main() {
     };
 
     let mut skip_categories: HashSet<String> = HashSet::new();
+    skip_categories.insert("SKIP".to_string()); // By default any category marked SKIP is skipped
 
     if let Some(values) = args.get_many::<String>("skip-categories") {
         skip_categories.extend(values.cloned());
