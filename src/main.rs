@@ -188,8 +188,6 @@ fn main() {
 
     if let Some(values) = args.get_many::<String>("skip-categories") {
         skip_categories.extend(values.cloned());
-    } else {
-        println!("No values provided");
     }
 
     let save_nfa = args.get_flag("save-nfa");
