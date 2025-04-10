@@ -6,7 +6,7 @@ use bitvec::vec::BitVec;
 
 use crate::dfa::DFA;
 use crate::fa::{Symbol, FA};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufReader, Read, Write};
@@ -340,7 +340,13 @@ impl Scanner {
         }
     }
 
-    pub fn scan(&self, source_file: PathBuf, out_file: PathBuf, skip_whitespace: bool) {
+    pub fn scan(
+        &self,
+        source_file: PathBuf,
+        out_file: PathBuf,
+        skip_whitespace: bool,
+        skip_categories: HashSet<String>,
+    ) {
         let mut buffer = Buffer::new(source_file);
 
         let mut out_file = match File::create(out_file) {
@@ -353,6 +359,10 @@ impl Scanner {
                 Err(error) => panic!("Bad token found! {} is not a valid token", error),
                 Ok(next_word) => next_word,
             };
+
+            if skip_categories.contains(&next_word.1) {
+                continue;
+            }
 
             let output_line = format!("({:?}, {})", next_word.0, next_word.1);
             let _ = match writeln!(out_file, "{}", output_line) {

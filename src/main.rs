@@ -1,6 +1,6 @@
 use crate::reg_ex::RegEx;
 use clap::{Arg, Command};
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::PathBuf;
@@ -126,6 +126,17 @@ fn main() {
                             .value_parser(clap::value_parser!(String))
                             .num_args(1)
                         )
+                        .arg(
+                            Arg::new("skip-categories")
+                            .short('s')
+                            .long("skip-categories")
+                            .help("Provide list of syntactic categories which can be skipped in the final lex output which is to be fed to the parser")
+                            .value_name("CATEGORY")
+                            .num_args(1)
+                            .value_parser(clap::value_parser!(String))
+                            .action(clap::ArgAction::Append)
+
+                        )
                         .get_matches();
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
@@ -171,6 +182,14 @@ fn main() {
             &PathBuf::from(out_file_name)
         }
     };
+
+    let mut skip_categories: HashSet<String> = HashSet::new();
+
+    if let Some(values) = args.get_many::<String>("skip-categories") {
+        skip_categories.extend(values.cloned());
+    } else {
+        println!("No values provided");
+    }
 
     let save_nfa = args.get_flag("save-nfa");
 
@@ -221,6 +240,7 @@ fn main() {
         src_file_path.to_path_buf(),
         out_file_path.to_path_buf(),
         skip_whitespace,
+        skip_categories,
     );
 
     if visualize == "nfa" {
