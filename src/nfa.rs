@@ -403,6 +403,9 @@ impl NFA {
             ')' => ')',
             '[' => '[',
             ']' => ']',
+            '|' => '|',
+            '*' => '*',
+            '+' => '+',
             _ => panic!("Invalid escape cahracter found!"),
         };
 
