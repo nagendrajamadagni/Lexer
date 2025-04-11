@@ -364,7 +364,7 @@ impl Scanner {
                 continue;
             }
 
-            let output_line = format!("({:?}, {})", next_word.0, next_word.1);
+            let output_line = format!("({}, {})", next_word.0, next_word.1);
             let _ = match writeln!(out_file, "{}", output_line) {
                 Err(_) => panic!("Failed to write to output file!"),
                 Ok(_) => {}
