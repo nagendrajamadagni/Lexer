@@ -41,10 +41,14 @@ fn read_microsyntax_file(
             panic!("Error: Malformed microsyntax file! Each file should contain only 2 :: separated values, the regex and the syntactic category described by the regex")
         }
 
-        let pair = (content[0].to_string(), content[1].to_string());
+        let lhs = content[0];
+        let lhs = lhs.replace("\\:\\:", "::"); // Escape the double colons itself
+        let rhs = content[1];
+
+        let pair = (lhs.to_string(), rhs.to_string());
         regex_list.push_back(pair);
 
-        token_type_priority_list.push_back(content[1].to_string());
+        token_type_priority_list.push_back(rhs.to_string());
     }
 
     Ok((regex_list, token_type_priority_list))
