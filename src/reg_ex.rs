@@ -103,6 +103,7 @@ fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
                     '|' => char_set.insert('|'),
                     '*' => char_set.insert('*'),
                     '+' => char_set.insert('+'),
+                    '?' => char_set.insert('?'),
                     _ => panic!("Invalid escape character provided"),
                 };
                 new_start = new_start + 2;
