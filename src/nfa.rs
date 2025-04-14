@@ -407,7 +407,7 @@ impl NFA {
             '*' => '*',
             '+' => '+',
             '?' => '?',
-            _ => panic!("Invalid escape cahracter found!"),
+            _ => panic!("Invalid escape cahracter found {}!", character),
         };
 
         result.alphabet.insert(escape_character);

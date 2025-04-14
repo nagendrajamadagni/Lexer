@@ -142,7 +142,7 @@ fn parse_base(regex: &str, start: usize) -> (Base, usize) {
         let new_start = start + 1;
         (new_base, new_start)
     } else {
-        panic!("Invalid regex provided!");
+        panic!("Invalid regex provided!{} is not valid", regex);
     }
 }
 
