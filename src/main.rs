@@ -1,9 +1,4 @@
-use crate::reg_ex::RegEx;
 use clap::{Arg, Command};
-use std::collections::{HashSet, VecDeque};
-use std::fs::File;
-use std::io::{self, BufRead, BufReader};
-use std::path::PathBuf;
 
 mod dfa;
 mod fa;
@@ -11,46 +6,6 @@ mod nfa;
 mod reg_ex;
 mod scanner;
 mod visualizer;
-
-fn read_microsyntax_file(file_path: PathBuf) -> io::Result<VecDeque<(String, String)>> {
-    let file = File::open(file_path);
-    let file = match file {
-        Ok(file) => file,
-        Err(error) => panic!("Error: Failed to open the microsyntax file {:?}", error),
-    };
-    let reader = BufReader::new(file);
-
-    let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
-
-    //let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
-
-    for (line_number, line) in reader.lines().enumerate() {
-        let line = match line {
-            Ok(line) => line,
-            Err(error) => panic!(
-                "Error: Failed to read line number {:?} in microsyntaxes file! {:?}",
-                line_number, error
-            ),
-        };
-
-        let content: Vec<&str> = line.split("::").collect();
-
-        if content.len() != 2 {
-            panic!("Error: Malformed microsyntax file! Each line should contain only 2 :: separated values, the regex and the syntactic category described by the regex. Invalid line {:?}", content[0])
-        }
-
-        let lhs = content[0];
-        let lhs = lhs.replace("\\:\\:", "::"); // Escape the double colons itself
-        let rhs = content[1];
-
-        let pair = (lhs.to_string(), rhs.to_string());
-        regex_list.push_back(pair);
-
-        //token_type_priority_list.push_back(rhs.to_string());
-    }
-
-    Ok(regex_list)
-}
 
 fn main() {
     let args = Command::new("lexer")
@@ -91,7 +46,7 @@ fn main() {
                                 .long("microsyntax-file")
                                 .help("Provide a file with a list of regular expressions and the corresponsing syntactic category name. The order of the list determines the priority of the regular expressions during token scanning")
                                 .value_name("MICROSYNTAX FILE")
-                                .value_parser(clap::value_parser!(PathBuf))
+                                .value_parser(clap::value_parser!(String))
                         )
                         .arg(
                             Arg::new("input")
@@ -99,7 +54,7 @@ fn main() {
                             .long("input")
                             .help("The program source file which should be scanned and tokenized")
                             .value_name("INPUT SOURCE FILE")
-                            .value_parser(clap::value_parser!(PathBuf))
+                            .value_parser(clap::value_parser!(String))
                             .required(true)
                         )
                         .arg(
@@ -108,7 +63,7 @@ fn main() {
                             .long("output")
                             .help("The output file to store the lexer's output")
                             .value_name("OUTPUT RESULT FILE")
-                            .value_parser(clap::value_parser!(PathBuf))
+                            .value_parser(clap::value_parser!(String))
                         )
                         .arg(
                             Arg::new("skip-whitespace")
@@ -141,55 +96,34 @@ fn main() {
                         )
                         .get_matches();
 
-    let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
+    let mut regex_list: Vec<(String, String)> = Vec::new();
 
-    let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
-
-    if let Some(mst_file_path) = args.get_one::<PathBuf>("microsyntax-file") {
-        if mst_file_path.exists() {
-            let rlist = match read_microsyntax_file(mst_file_path.to_path_buf()) {
-                Ok(rlist) => rlist,
-                Err(error) => panic!("Error reading the microsyntax file {:?}", error),
-            };
-            regex_list = rlist;
-        } else {
-            panic!("Error: Provided file does not exist!");
-        }
+    if let Some(mst_file_path) = args.get_one::<String>("microsyntax-file") {
+        let rlist = match reg_ex::read_microsyntax_file(mst_file_path.to_string()) {
+            Ok(rlist) => rlist,
+            Err(error) => panic!("Error reading the microsyntax file {:?}", error),
+        };
+        regex_list = rlist;
     } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
-            let value_vec: Vec<_> = value_group.collect();
-
-            if value_vec.len() == 2 {
-                regex_list.push_back((value_vec[0].clone(), value_vec[1].clone()));
-            } else {
-                panic!("Error: Both regex and syntactic category should be provided");
-            }
-
-            token_type_priority_list.push_back(value_vec[1].clone());
+            let value_vec: Vec<_> = value_group.cloned().collect();
+            regex_list.push(reg_ex::read_microsyntax(value_vec));
         }
     } else {
         panic!("Error: Either a microsyntax file or a list of microsyntaxes should be provided!");
     }
 
-    let src_file_path = match args.get_one::<PathBuf>("input") {
-        Some(file_path) => file_path,
+    let src_file_path = match args.get_one::<String>("input") {
+        Some(file_path) => file_path.to_string(),
         None => panic!("Error: Input source file not provided!"),
     };
 
-    let out_file_path = match args.get_one::<PathBuf>("output") {
-        Some(file_path) => file_path,
-        None => {
-            let in_file_stem = src_file_path.file_stem().unwrap().to_str().unwrap();
-            let out_file_name = format!("{in_file_stem}.lex");
-            &PathBuf::from(out_file_name)
-        }
-    };
+    let out_file_path = args.get_one::<String>("output").cloned();
 
-    let mut skip_categories: HashSet<String> = HashSet::new();
-    skip_categories.insert("SKIP".to_string()); // By default any category marked SKIP is skipped
+    let mut skip_list: Vec<String> = Vec::new();
 
     if let Some(values) = args.get_many::<String>("skip-categories") {
-        skip_categories.extend(values.cloned());
+        skip_list = values.cloned().collect();
     }
 
     let save_nfa = args.get_flag("save-nfa");
@@ -220,15 +154,7 @@ fn main() {
         }
     };
 
-    let mut syntax_tree_list: VecDeque<(String, RegEx, String)> = VecDeque::new();
-
-    while !regex_list.is_empty() {
-        let (regex, category) = regex_list.pop_front().unwrap();
-
-        let syntax_tree = reg_ex::build_syntax_tree(&regex);
-
-        syntax_tree_list.push_back((regex, syntax_tree, category));
-    }
+    let syntax_tree_list = reg_ex::parse_microsyntax_list(regex_list);
 
     let nfa = nfa::construct_nfa(syntax_tree_list, save_nfa);
 
@@ -238,10 +164,10 @@ fn main() {
     let scanner = scanner::construct_scanner(&minimal_dfa);
 
     scanner.scan(
-        src_file_path.to_path_buf(),
-        out_file_path.to_path_buf(),
+        src_file_path,
+        out_file_path,
         skip_whitespace,
-        skip_categories,
+        Some(skip_list),
     );
 
     if visualize == "nfa" {

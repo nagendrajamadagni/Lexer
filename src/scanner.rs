@@ -342,11 +342,22 @@ impl Scanner {
 
     pub fn scan(
         &self,
-        source_file: PathBuf,
-        out_file: PathBuf,
+        source_file: String,
+        out_file: Option<String>,
         skip_whitespace: bool,
-        skip_categories: HashSet<String>,
+        skip_list: Option<Vec<String>>,
     ) {
+        let source_file = PathBuf::from(source_file);
+
+        let out_file = match out_file {
+            Some(path) => path,
+            None => {
+                let infile_stem = source_file.file_stem().unwrap().to_str().unwrap();
+                let out_file_path = format!("{infile_stem}.lex");
+                out_file_path
+            }
+        };
+
         let mut buffer = Buffer::new(source_file);
 
         let mut out_file = match File::create(out_file) {
@@ -354,13 +365,22 @@ impl Scanner {
             Err(error) => panic!("Could not create output file! {}", error),
         };
 
+        let mut skip_set = HashSet::new();
+        skip_set.insert("SKIP".to_string());
+
+        if skip_list.is_some() {
+            for elem in skip_list.unwrap() {
+                skip_set.insert(elem);
+            }
+        }
+
         while !buffer.is_eof() {
             let next_word = match self.next_word(&mut buffer, skip_whitespace) {
                 Err(error) => panic!("Bad token found! {} is not a valid token", error),
                 Ok(next_word) => next_word,
             };
 
-            if skip_categories.contains(&next_word.1) {
+            if skip_set.contains(&next_word.1) {
                 continue;
             }
 

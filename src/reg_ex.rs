@@ -2,6 +2,10 @@
  * https://matt.might.net/articles/parsing-regex-with-recursive-descent/ */
 
 use std::collections::HashSet;
+use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum Quantifier {
@@ -201,7 +205,7 @@ fn parse_regex(regex: &str, start: usize) -> (RegEx, usize) {
     }
 }
 
-pub fn build_syntax_tree(regex: &str) -> RegEx {
+fn build_syntax_tree(regex: &str) -> RegEx {
     if !balanced_brackets(regex) {
         panic!("The provided regular expression has unbalanced parentheses");
     }
@@ -212,4 +216,69 @@ pub fn build_syntax_tree(regex: &str) -> RegEx {
 
     let (syntax_tree, _) = parse_regex(regex, 0);
     return syntax_tree;
+}
+
+pub fn parse_microsyntax_list(
+    regex_list: Vec<(String, String)>,
+) -> VecDeque<(String, RegEx, String)> {
+    let mut syntax_tree_list = VecDeque::new();
+
+    for regex_entry in regex_list {
+        let (regex, category) = regex_entry;
+
+        let syntax_tree = build_syntax_tree(&regex);
+
+        syntax_tree_list.push_back((regex, syntax_tree, category));
+    }
+    return syntax_tree_list;
+}
+
+pub fn read_microsyntax_file(file_path: String) -> io::Result<Vec<(String, String)>> {
+    let file_path = PathBuf::from(file_path);
+
+    if !file_path.exists() {
+        panic!("Error: Provided file does not exist!");
+    }
+
+    let file = File::open(file_path);
+    let file = match file {
+        Ok(file) => file,
+        Err(error) => panic!("Error: Failed to open the microsyntax file {:?}", error),
+    };
+    let reader = BufReader::new(file);
+
+    let mut regex_list: Vec<(String, String)> = Vec::new();
+
+    for (line_number, line) in reader.lines().enumerate() {
+        let line = match line {
+            Ok(line) => line,
+            Err(error) => panic!(
+                "Error: Failed to read line number {:?} in microsyntaxes file! {:?}",
+                line_number, error
+            ),
+        };
+
+        let content: Vec<&str> = line.split("::").collect();
+
+        if content.len() != 2 {
+            panic!("Error: Malformed microsyntax file! Each line should contain only 2 :: separated values, the regex and the syntactic category described by the regex. Invalid line {:?}", content[0])
+        }
+
+        let lhs = content[0];
+        let lhs = lhs.replace("\\:\\:", "::"); // Escape the double colons itself
+        let rhs = content[1];
+
+        let pair = (lhs.to_string(), rhs.to_string());
+        regex_list.push(pair);
+    }
+
+    Ok(regex_list)
+}
+
+pub fn read_microsyntax(value_vec: Vec<String>) -> (String, String) {
+    if value_vec.len() == 2 {
+        return (value_vec[0].clone(), value_vec[1].clone());
+    } else {
+        panic!("Error: Both regex and syntactic category should be provided");
+    }
 }
