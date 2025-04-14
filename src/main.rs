@@ -12,9 +12,7 @@ mod reg_ex;
 mod scanner;
 mod visualizer;
 
-fn read_microsyntax_file(
-    file_path: PathBuf,
-) -> io::Result<(VecDeque<(String, String)>, VecDeque<String>)> {
+fn read_microsyntax_file(file_path: PathBuf) -> io::Result<VecDeque<(String, String)>> {
     let file = File::open(file_path);
     let file = match file {
         Ok(file) => file,
@@ -24,7 +22,7 @@ fn read_microsyntax_file(
 
     let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
 
-    let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
+    //let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
 
     for (line_number, line) in reader.lines().enumerate() {
         let line = match line {
@@ -38,7 +36,7 @@ fn read_microsyntax_file(
         let content: Vec<&str> = line.split("::").collect();
 
         if content.len() != 2 {
-            panic!("Error: Malformed microsyntax file! Each file should contain only 2 :: separated values, the regex and the syntactic category described by the regex")
+            panic!("Error: Malformed microsyntax file! Each line should contain only 2 :: separated values, the regex and the syntactic category described by the regex. Invalid line {:?}", content[0])
         }
 
         let lhs = content[0];
@@ -48,10 +46,10 @@ fn read_microsyntax_file(
         let pair = (lhs.to_string(), rhs.to_string());
         regex_list.push_back(pair);
 
-        token_type_priority_list.push_back(rhs.to_string());
+        //token_type_priority_list.push_back(rhs.to_string());
     }
 
-    Ok((regex_list, token_type_priority_list))
+    Ok(regex_list)
 }
 
 fn main() {
@@ -149,8 +147,8 @@ fn main() {
 
     if let Some(mst_file_path) = args.get_one::<PathBuf>("microsyntax-file") {
         if mst_file_path.exists() {
-            let (rlist, _) = match read_microsyntax_file(mst_file_path.to_path_buf()) {
-                Ok((rlist, plist)) => (rlist, plist),
+            let rlist = match read_microsyntax_file(mst_file_path.to_path_buf()) {
+                Ok(rlist) => rlist,
                 Err(error) => panic!("Error reading the microsyntax file {:?}", error),
             };
             regex_list = rlist;
