@@ -70,15 +70,16 @@ impl NFAState {
             category: String::new(),
         }
     }
-
+    /// Get a list of all outgoing transitions for the given state
     pub fn get_transitions(&self) -> &HashMap<Symbol, HashSet<usize>> {
         &self.transitions
     }
-
+    /// Get the id of the state
     pub fn get_id(&self) -> usize {
         return self.id;
     }
-
+    /// Get the syntactic category that this state accepts, if it is an accept state. Otherwise, it
+    /// returns an empty string.
     pub fn get_category(&self) -> &String {
         &self.category
     }
@@ -422,7 +423,7 @@ impl NFA {
 
         return result;
     }
-
+    /// Get the state for the provided id
     pub fn get_state(&self, id: usize) -> &NFAState {
         let state = self.states.get(id);
         match state {
@@ -445,7 +446,7 @@ impl NFA {
             }
         }
     }
-
+    /// Get the regular expression that the NFA models
     pub fn get_regex(&self) -> &String {
         return &self.regex;
     }
@@ -507,6 +508,8 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
     }
 }
 
+/// Apply Thomson construction algorithm to build an NFA for a given regular expression syntax
+/// tree. If save_nfa is set to true, the constructed NFA is saved as a jpg.
 pub fn construct_nfa(
     mut syntax_tree_list: VecDeque<(String, RegEx, String)>,
     save_nfa: bool,

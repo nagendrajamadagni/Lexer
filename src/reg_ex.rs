@@ -217,7 +217,7 @@ fn build_syntax_tree(regex: &str) -> RegEx {
     let (syntax_tree, _) = parse_regex(regex, 0);
     return syntax_tree;
 }
-
+/// Parse a list of microsyntaxes provided and return the parse trees
 pub fn parse_microsyntax_list(
     regex_list: Vec<(String, String)>,
 ) -> VecDeque<(String, RegEx, String)> {
@@ -232,7 +232,7 @@ pub fn parse_microsyntax_list(
     }
     return syntax_tree_list;
 }
-
+/// Parse a file containing microsyntaxes and return the parse trees
 pub fn read_microsyntax_file(file_path: String) -> io::Result<Vec<(String, String)>> {
     let file_path = PathBuf::from(file_path);
 
@@ -273,12 +273,4 @@ pub fn read_microsyntax_file(file_path: String) -> io::Result<Vec<(String, Strin
     }
 
     Ok(regex_list)
-}
-
-pub fn read_microsyntax(value_vec: Vec<String>) -> (String, String) {
-    if value_vec.len() == 2 {
-        return (value_vec[0].clone(), value_vec[1].clone());
-    } else {
-        panic!("Error: Both regex and syntactic category should be provided");
-    }
 }

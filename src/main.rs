@@ -1,11 +1,8 @@
 use clap::{Arg, Command};
-
-mod dfa;
-mod fa;
-mod nfa;
-mod reg_ex;
-mod scanner;
-mod visualizer;
+use lexer::{
+    construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
+    read_microsyntax_file, visualize,
+};
 
 fn main() {
     let args = Command::new("lexer")
@@ -99,15 +96,19 @@ fn main() {
     let mut regex_list: Vec<(String, String)> = Vec::new();
 
     if let Some(mst_file_path) = args.get_one::<String>("microsyntax-file") {
-        let rlist = match reg_ex::read_microsyntax_file(mst_file_path.to_string()) {
+        let rlist = match read_microsyntax_file(mst_file_path.to_string()) {
             Ok(rlist) => rlist,
             Err(error) => panic!("Error reading the microsyntax file {:?}", error),
         };
         regex_list = rlist;
     } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
-            let value_vec: Vec<_> = value_group.cloned().collect();
-            regex_list.push(reg_ex::read_microsyntax(value_vec));
+            let value_vec: Vec<_> = value_group.collect();
+            if value_vec.len() == 2 {
+                regex_list.push((value_vec[0].to_string(), value_vec[1].to_string()));
+            } else {
+                panic!("Error: Both regex and syntactic category should be provided");
+            }
         }
     } else {
         panic!("Error: Either a microsyntax file or a list of microsyntaxes should be provided!");
@@ -137,9 +138,9 @@ fn main() {
         .copied()
         .unwrap_or(true);
 
-    let visualize = args.get_one::<String>("visualize");
+    let visualize_opt = args.get_one::<String>("visualize");
 
-    let visualize = match visualize {
+    let visualize_opt = match visualize_opt {
         None => "none",
         Some(str) => {
             if str.eq_ignore_ascii_case("nfa") {
@@ -154,14 +155,14 @@ fn main() {
         }
     };
 
-    let syntax_tree_list = reg_ex::parse_microsyntax_list(regex_list);
+    let syntax_tree_list = parse_microsyntax_list(regex_list);
 
-    let nfa = nfa::construct_nfa(syntax_tree_list, save_nfa);
+    let nfa = construct_nfa(syntax_tree_list, save_nfa);
 
-    let dfa = dfa::construct_dfa(&nfa, save_dfa);
-    let minimal_dfa = dfa::construct_minimal_dfa(&dfa, save_minimal_dfa);
+    let dfa = construct_dfa(&nfa, save_dfa);
+    let minimal_dfa = construct_minimal_dfa(&dfa, save_minimal_dfa);
 
-    let scanner = scanner::construct_scanner(&minimal_dfa);
+    let scanner = construct_scanner(&minimal_dfa);
 
     scanner.scan(
         src_file_path,
@@ -170,11 +171,11 @@ fn main() {
         Some(skip_list),
     );
 
-    if visualize == "nfa" {
-        visualizer::visualize(&nfa);
-    } else if visualize == "dfa" {
-        visualizer::visualize(&dfa);
-    } else if visualize == "minimal" {
-        visualizer::visualize(&minimal_dfa);
+    if visualize_opt == "nfa" {
+        visualize(&nfa);
+    } else if visualize_opt == "dfa" {
+        visualize(&dfa);
+    } else if visualize_opt == "minimal" {
+        visualize(&minimal_dfa);
     }
 }

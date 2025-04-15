@@ -1,6 +1,6 @@
 [package]
-name = "Lexer"
-version = "0.1.0"
+name = "lexer"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
@@ -13,4 +13,4 @@ egui = "0.31.1"
 eframe = "0.31.1"
 
 [profile.release]
-debug = true  # Enables DWARF debug info for Valgrind
+debug = true  # Enables DWARF debug info

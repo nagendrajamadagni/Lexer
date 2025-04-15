@@ -118,7 +118,7 @@ impl DFAState {
             category: String::new(),
         }
     }
-
+    /// Get a list of all outgoing transitions for the given state
     pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
         &self.transitions
     }
@@ -126,7 +126,8 @@ impl DFAState {
     fn set_category(&mut self, category: String) {
         self.category = category;
     }
-
+    /// Get the syntactic category which this DFA state accepts if it is an accept state. Otherwise it
+    /// returns an empty string.
     pub fn get_category(&self) -> &String {
         &self.category
     }
@@ -202,6 +203,7 @@ impl DFA {
         }
     }
 
+    /// Returns a reference to the DFA state whose id is provided
     pub fn get_state(&self, id: usize) -> &DFAState {
         let state = self.states.get(id);
         match state {
@@ -209,7 +211,7 @@ impl DFA {
             None => panic!("Invalid state index provided"),
         }
     }
-
+    /// Returns a list of all states present in the DFA
     pub fn get_states(&self) -> Vec<DFAState> {
         self.states.clone()
     }
@@ -491,7 +493,8 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
 
     return result;
 }
-
+// Apply Hopcroft's algorithm on a provided DFA to minimize it. If save_minimal_dfa is set to true,
+// the constructed minimal DFA is saved as a jpg.
 pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
     let lookup_table = get_lookup_table(&dfa);
     let sets = lookup_table.set_to_states_map.values();
@@ -577,7 +580,8 @@ pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
 
     return result; // We need to always reorder now as visualization is possible
 }
-
+///  Apply the subset construction algorithm on an NFA to build a DFA. If save_dfa is set to true,
+///  the constructed DFA is saved as a jpg.
 pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     let mut result = DFA::new(); // Create new DFA
     result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
