@@ -493,8 +493,8 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
 
     return result;
 }
-// Apply Hopcroft's algorithm on a provided DFA to minimize it. If save_minimal_dfa is set to true,
-// the constructed minimal DFA is saved as a jpg.
+/// Apply Hopcroft's algorithm on a provided DFA to minimize it. If save_minimal_dfa is set to true,
+/// the constructed minimal DFA is saved as a jpg.
 pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
     let lookup_table = get_lookup_table(&dfa);
     let sets = lookup_table.set_to_states_map.values();

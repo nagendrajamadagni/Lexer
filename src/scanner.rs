@@ -339,7 +339,12 @@ impl Scanner {
             Ok((lexeme, category.to_string()))
         }
     }
-
+    /// Scan the source file for tokens and accept valid tokens and categorize them. The accepted
+    /// tokens are written out to the out_file. If skip_whitespace
+    /// is true, whitespace tokens are skipped (except within double quotes) without throwing an error.
+    /// The skip list is an optional list of syntactic categories that can be skipped without writing
+    /// them out to the out_file. By default, any tokens belonging to the SKIP category are not written
+    /// to the outfile.
     pub fn scan(
         &self,
         source_file: String,
@@ -398,7 +403,7 @@ impl Scanner {
         println!("{:?}", self.classifier_table);
     }
 }
-
+/// Construct a scanner for the provided DFA. For best performance, always provide the minized DFA.
 pub fn construct_scanner(dfa: &DFA) -> Scanner {
     let mut scanner = Scanner::new();
 

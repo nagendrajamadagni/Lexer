@@ -129,7 +129,7 @@ fn generate_stable_graph<T: FA>(fa: &T) -> Graph {
 
     return graph;
 }
-
+/// Visualizes the finite automata provided
 pub fn visualize<T: FA>(fa: &T) {
     let graph = generate_stable_graph(fa);
     run_native(
