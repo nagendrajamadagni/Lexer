@@ -164,12 +164,20 @@ fn main() {
 
     let scanner = construct_scanner(&minimal_dfa);
 
-    scanner.scan(
+    let token_list = scanner.scan(
         src_file_path,
         out_file_path,
         skip_whitespace,
         Some(skip_list),
     );
+
+    for token in token_list {
+        println!(
+            "The token is {} and the category is {}",
+            token.get_token(),
+            token.get_category()
+        );
+    }
 
     if visualize_opt == "nfa" {
         visualize(&nfa);

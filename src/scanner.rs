@@ -12,6 +12,25 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
+pub struct Token {
+    token: String,
+    category: String,
+}
+
+impl Token {
+    fn new(token: String, category: String) -> Self {
+        Token { token, category }
+    }
+    /// Get the token from the Token struct
+    pub fn get_token(&self) -> &String {
+        &self.token
+    }
+    /// Get the syntactic category to which the token belongs to
+    pub fn get_category(&self) -> &String {
+        &self.category
+    }
+}
+
 struct Buffer {
     source_buffer: [u8; 1024],
     input_ptr: usize,
@@ -351,24 +370,14 @@ impl Scanner {
         out_file: Option<String>,
         skip_whitespace: bool,
         skip_list: Option<Vec<String>>,
-    ) {
+    ) -> Vec<Token> {
         let source_file = PathBuf::from(source_file);
 
-        let out_file = match out_file {
-            Some(path) => path,
-            None => {
-                let infile_stem = source_file.file_stem().unwrap().to_str().unwrap();
-                let out_file_path = format!("{infile_stem}.lex");
-                out_file_path
-            }
-        };
+        let write_to_file = out_file.is_some();
+
+        let mut token_list: Vec<Token> = Vec::new();
 
         let mut buffer = Buffer::new(source_file);
-
-        let mut out_file = match File::create(out_file) {
-            Ok(file) => file,
-            Err(error) => panic!("Could not create output file! {}", error),
-        };
 
         let mut skip_set = HashSet::new();
         skip_set.insert("SKIP".to_string());
@@ -389,12 +398,24 @@ impl Scanner {
                 continue;
             }
 
-            let output_line = format!("({}, {})", next_word.0, next_word.1);
-            let _ = match writeln!(out_file, "{}", output_line) {
-                Err(_) => panic!("Failed to write to output file!"),
-                Ok(_) => {}
-            };
+            token_list.push(Token::new(next_word.0, next_word.1));
         }
+        if write_to_file {
+            let mut out_file = match File::create(out_file.unwrap()) {
+                Ok(file) => file,
+                Err(error) => panic!("Could not create output file! {}", error),
+            };
+
+            for token in token_list.iter() {
+                let output_line = format!("({}, {})", token.token, token.category);
+
+                let _ = match writeln!(out_file, "{}", output_line) {
+                    Err(_) => panic!("Failed to write to output file!"),
+                    Ok(_) => {}
+                };
+            }
+        }
+        return token_list;
     }
 
     #[allow(dead_code)]
