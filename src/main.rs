@@ -97,7 +97,7 @@ fn main() -> Result<(), LexerError> {
 
     if let Some(mst_file_path) = args.get_one::<String>("microsyntax-file") {
         let rlist = read_microsyntax_file(mst_file_path.to_string())
-            .map_err(|e| LexerError::MicroSyntaxReadError)?;
+            .map_err(|_| LexerError::MicroSyntaxReadError)?;
         regex_list = rlist;
     } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {

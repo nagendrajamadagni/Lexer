@@ -7,6 +7,7 @@ use bitvec::vec::BitVec;
 use crate::dfa::DFA;
 use crate::fa::{Symbol, FA};
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 use std::fs::File;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufReader, Read, Write};
@@ -31,6 +32,21 @@ impl Token {
     }
 }
 
+#[derive(Debug)]
+enum BufferError {
+    RollbackError,
+}
+
+impl std::fmt::Display for BufferError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RollbackError => write!(f, "Error: Buffer rollback failed!"),
+        }
+    }
+}
+
+impl std::error::Error for BufferError {}
+
 struct Buffer {
     source_buffer: [u8; 1024],
     input_ptr: usize,
@@ -39,11 +55,8 @@ struct Buffer {
 }
 
 impl Buffer {
-    fn new(file_path: PathBuf) -> Self {
-        let file = match File::open(file_path) {
-            Ok(file) => file,
-            Err(error) => panic!("Error: Could not open the file {:?}", error),
-        };
+    fn new(file_path: PathBuf) -> Result<Self, std::io::Error> {
+        let file = File::open(file_path)?;
 
         let buf_reader = BufReader::new(file);
         let mut buffer = Buffer {
@@ -54,24 +67,25 @@ impl Buffer {
         };
 
         buffer.fill_buffer(0, buffer.source_buffer.len() / 2);
-        return buffer;
+        return Ok(buffer);
     }
 
     fn fill_buffer(&mut self, start: usize, end: usize) {
         assert!(end > start);
         assert!(end - start == self.source_buffer.len() / 2);
-        let _ = match self.buf_reader.read(&mut self.source_buffer[start..end]) {
-            Ok(pos) => pos,
-            Err(error) => panic!("Error: Failed to read bytes from file {:?}", error),
-        };
+        let _ = self
+            .buf_reader
+            .read(&mut self.source_buffer[start..end])
+            .unwrap();
     }
 
-    fn rollback(&mut self, amount: usize) {
+    fn rollback(&mut self, amount: usize) -> Result<(), BufferError> {
         if self.input_ptr - amount <= self.fence {
-            panic!("Error: Rollback failed!");
+            return Err(BufferError::RollbackError);
         }
 
         self.input_ptr = (self.input_ptr - amount) % self.source_buffer.len();
+        Ok(())
     }
 
     fn next_char(&mut self) -> char {
@@ -95,6 +109,25 @@ impl Buffer {
         ch == 0
     }
 }
+
+#[derive(Debug)]
+enum ScannerError {
+    EpsilonInDFA,
+    BadToken(String),
+}
+
+impl std::fmt::Display for ScannerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScannerError::EpsilonInDFA => write!(f, "Error: Found an epsilon transition in a DFA!"),
+            ScannerError::BadToken(token) => {
+                write!(f, "Error: Bad token found! {} is not a valid token!", token)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ScannerError {}
 
 pub struct Scanner {
     transition_table: Vec<Vec<usize>>, // Matrix of input characters and dfa states
@@ -169,7 +202,7 @@ impl Scanner {
         }
     }
 
-    fn init_transition_table(&mut self, dfa: &DFA) {
+    fn init_transition_table(&mut self, dfa: &DFA) -> Result<(), ScannerError> {
         // Add a column for every character in the alphabet and a row for every state in the DFA
 
         let mut alphabet: Vec<char> = dfa.get_alphabet().iter().cloned().collect();
@@ -200,14 +233,11 @@ impl Scanner {
                 let target = transition.1;
 
                 let symbol = match symbol {
-                    Symbol::Epsilon => panic!("Epsilon transition found in a DFA"),
+                    Symbol::Epsilon => return Err(ScannerError::EpsilonInDFA),
                     Symbol::Char(ch) => ch,
                 };
 
-                let char_index = match alphabet.binary_search(symbol) {
-                    Ok(index) => index,
-                    Err(_) => panic!("Character {:?} not found in alphabet", symbol),
-                }; // Get the index in the sorted alphabet set for the character
+                let char_index = alphabet.binary_search(symbol).unwrap(); // Get the index in the sorted alphabet set for the character
 
                 init_transition_table[state][char_index] = *target; // For that state index and char
                                                                     // index mark the transition
@@ -224,7 +254,10 @@ impl Scanner {
         self.accept_states = dfa.get_acceptor_states().clone();
 
         self.accept_states.push(false);
+
+        Ok(())
     }
+
     #[allow(dead_code)]
     #[cfg(debug_assertions)]
     fn print_transition_table(&self) {
@@ -250,7 +283,7 @@ impl Scanner {
         &self,
         buffer: &mut Buffer,
         skip_whitespace: bool,
-    ) -> Result<(String, String), String> {
+    ) -> Result<(String, String), ScannerError> {
         let mut state = self.start_state; // Keeps track of the current state in the DFA
         let mut lexeme = String::new();
         let mut stack: VecDeque<(usize, usize)> = VecDeque::new(); // Stack to back track after
@@ -303,12 +336,7 @@ impl Scanner {
 
             let next_state = self.transition_table[state][*category];
 
-            let is_accept = self.accept_states.get(next_state);
-
-            let is_accept = match is_accept {
-                None => panic!("Invalid state provided"),
-                Some(is_accept) => is_accept,
-            };
+            let is_accept = self.accept_states.get(next_state).unwrap();
 
             if *is_accept {
                 last_accept_pos = cur_pos.try_into().unwrap();
@@ -325,7 +353,7 @@ impl Scanner {
 
         if last_accept_pos == -1 && last_accept_state == -1 {
             // We never found a good token return bad token
-            Err(lexeme)
+            Err(ScannerError::BadToken(lexeme))
         } else {
             // Truncate lexeme to last_accept_pos size
             // Rollback buffer by same number of characters
@@ -334,14 +362,11 @@ impl Scanner {
 
             let rollback_amount = cur_pos - last_accept;
 
-            buffer.rollback(rollback_amount);
+            buffer.rollback(rollback_amount).unwrap();
             lexeme.truncate(lexeme.len() - rollback_amount);
 
             while !stack.is_empty() {
-                let (state, pos) = match stack.pop_front() {
-                    Some((state, pos)) => (state, pos),
-                    None => panic!("Trying to pop from an empty stack"),
-                };
+                let (state, pos) = stack.pop_front().unwrap();
 
                 if last_accept_pos < pos.try_into().unwrap() {
                     failed_points.insert((state, pos), true);
@@ -350,10 +375,7 @@ impl Scanner {
 
             let final_accept_state: usize = last_accept_state.try_into().unwrap();
 
-            let category = match self.token_type_table.get(&final_accept_state) {
-                Some(category) => category,
-                None => panic!("Error: Accept state does not belong to any known category"),
-            };
+            let category = self.token_type_table.get(&final_accept_state).unwrap();
 
             Ok((lexeme, category.to_string()))
         }
@@ -377,7 +399,7 @@ impl Scanner {
 
         let mut token_list: Vec<Token> = Vec::new();
 
-        let mut buffer = Buffer::new(source_file);
+        let mut buffer = Buffer::new(source_file).unwrap();
 
         let mut skip_set = HashSet::new();
         skip_set.insert("SKIP".to_string());
@@ -389,10 +411,7 @@ impl Scanner {
         }
 
         while !buffer.is_eof() {
-            let next_word = match self.next_word(&mut buffer, skip_whitespace) {
-                Err(error) => panic!("Bad token found! {} is not a valid token", error),
-                Ok(next_word) => next_word,
-            };
+            let next_word = self.next_word(&mut buffer, skip_whitespace).unwrap();
 
             if skip_set.contains(&next_word.1) {
                 continue;
@@ -401,18 +420,12 @@ impl Scanner {
             token_list.push(Token::new(next_word.0, next_word.1));
         }
         if write_to_file {
-            let mut out_file = match File::create(out_file.unwrap()) {
-                Ok(file) => file,
-                Err(error) => panic!("Could not create output file! {}", error),
-            };
+            let mut out_file = File::create(out_file.unwrap()).unwrap();
 
             for token in token_list.iter() {
                 let output_line = format!("({}, {})", token.token, token.category);
 
-                let _ = match writeln!(out_file, "{}", output_line) {
-                    Err(_) => panic!("Failed to write to output file!"),
-                    Ok(_) => {}
-                };
+                let _ = writeln!(out_file, "{}", output_line).unwrap();
             }
         }
         return token_list;
@@ -428,7 +441,7 @@ impl Scanner {
 pub fn construct_scanner(dfa: &DFA) -> Scanner {
     let mut scanner = Scanner::new();
 
-    scanner.init_transition_table(dfa);
+    scanner.init_transition_table(dfa).unwrap();
 
     scanner.init_token_type_table(dfa);
 

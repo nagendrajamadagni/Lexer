@@ -541,13 +541,13 @@ pub fn construct_nfa(
     let mut result = parse_regex_tree(syntax_tree);
     result.regex = regex.to_string();
 
-    result.set_accept_category(category);
+    result.set_accept_category(category).unwrap();
 
     while !syntax_tree_list.is_empty() {
         let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
         let mut nfa = parse_regex_tree(syntax_tree);
         nfa.regex = regex.to_string();
-        nfa.set_accept_category(category);
+        nfa.set_accept_category(category).unwrap();
         let old_regex = result.regex.clone();
         result = NFA::alternation(result, nfa);
         let new_regex = format!("{old_regex}|{regex}");
