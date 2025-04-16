@@ -30,3 +30,10 @@ doc = true
 proc-macro = false
 crate-type = ["lib"]
 required-features = []
+
+[[bin]]
+name = "lexer"
+path = "src/bin/lexer.rs"
+test = false
+bench = false
+required-features = []
