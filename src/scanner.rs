@@ -80,9 +80,10 @@ impl Buffer {
             .unwrap();
     }
 
-    fn rollback(&mut self, amount: usize) -> Result<(), BufferError> {
+    fn rollback(&mut self, amount: usize) -> Result<()> {
         if self.input_ptr - amount <= self.fence {
-            return Err(BufferError::RollbackError);
+            let err = Report::new(BufferError::RollbackError);
+            return Err(err);
         }
 
         self.input_ptr = (self.input_ptr - amount) % self.source_buffer.len();
