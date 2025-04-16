@@ -1,13 +1,39 @@
 [package]
-name = "Lexer"
-version = "0.1.0"
+name = "lexer"
+version = "1.0.0"
 edition = "2021"
+description = """A customizable lexical analyser tool which also allows you to visualize the NFAs and DFAs generated."""
+authors = ["Nagendra Kumar Jamadagni <nagendrajamadagni@gmail.com>"]
+license = "MIT"
+keywords = ["compiler", "lexer", "lexical-analyser", "visualize", "finite-automata"]
+categories = ["compilers"]
+readme = "README.md"
+repository = "https://github.com/nagendrajamadagni/Lexer"
 
 [dependencies]
-petgraph = "0.6"
+petgraph = "0.7"
 dot = "0.1"
 bitvec = "1.0.1"
 clap = {version = "4.5", features = ["derive"]}
+egui_graphs = "0.24.0"
+egui = "0.31.1"
+eframe = "0.31.1"
+color-eyre = "0.6.3"
 
-[profile.release]
-debug = true  # Enables DWARF debug info for Valgrind
+[lib]
+name = "lexer"
+path = "src/lib.rs"
+test = false
+doctest = true
+bench = false
+doc = true
+proc-macro = false
+crate-type = ["lib"]
+required-features = []
+
+[[bin]]
+name = "lexer"
+path = "src/bin/lexer.rs"
+test = false
+bench = false
+required-features = []

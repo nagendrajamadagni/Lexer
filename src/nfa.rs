@@ -1,7 +1,10 @@
 use bitvec::prelude::*;
+use color_eyre::eyre::{Report, Result};
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::error;
+use std::fmt;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -9,6 +12,25 @@ use std::process::Command;
 
 use crate::fa::{Symbol, FA};
 use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
+
+#[derive(Debug)]
+pub enum NFAError {
+    InvalidEscapeCharError(char),
+    InvalidIndexError,
+}
+
+impl fmt::Display for NFAError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NFAError::InvalidEscapeCharError(ch) => {
+                write!(f, "Error: Invalid escape character {} provided!", ch)
+            }
+            NFAError::InvalidIndexError => write!(f, "Error: Invalid index provided!"),
+        }
+    }
+}
+
+impl error::Error for NFAError {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NFAState {
@@ -48,6 +70,18 @@ impl FA for NFA {
     fn get_acceptor_states(&self) -> &BitVec<u8> {
         return &self.accept_states;
     }
+    fn get_state_transitions(&self, state_id: usize) -> Vec<(&Symbol, &usize)> {
+        let mut transition_list: Vec<(&Symbol, &usize)> = Vec::new();
+
+        for transition in self.states[state_id].transitions.iter() {
+            let symbol = transition.0;
+            for target in transition.1.iter() {
+                transition_list.push((symbol, target));
+            }
+        }
+
+        return transition_list;
+    }
 }
 
 impl NFAState {
@@ -58,15 +92,16 @@ impl NFAState {
             category: String::new(),
         }
     }
-
+    /// Get a list of all outgoing transitions for the given state
     pub fn get_transitions(&self) -> &HashMap<Symbol, HashSet<usize>> {
         &self.transitions
     }
-
+    /// Get the id of the state
     pub fn get_id(&self) -> usize {
         return self.id;
     }
-
+    /// Get the syntactic category that this state accepts, if it is an accept state. Otherwise, it
+    /// returns an empty string.
     pub fn get_category(&self) -> &String {
         &self.category
     }
@@ -377,7 +412,7 @@ impl NFA {
         return result;
     }
 
-    fn escape_literal_construction(character: char) -> NFA {
+    fn escape_literal_construction(character: char) -> Result<NFA, NFAError> {
         let mut result: NFA = NFA::new();
         let start_state = result.add_state();
         let end_state = result.add_state();
@@ -391,7 +426,11 @@ impl NFA {
             ')' => ')',
             '[' => '[',
             ']' => ']',
-            _ => panic!("Invalid escape cahracter found!"),
+            '|' => '|',
+            '*' => '*',
+            '+' => '+',
+            '?' => '?',
+            _ => return Err(NFAError::InvalidEscapeCharError(character)),
         };
 
         result.alphabet.insert(escape_character);
@@ -404,41 +443,48 @@ impl NFA {
         result.start_state = start_state;
         result.accept_states.set(end_state, true);
 
-        return result;
+        return Ok(result);
     }
-
-    pub fn get_state(&self, id: usize) -> &NFAState {
+    /// Get the state for the provided id
+    pub fn get_state(&self, id: usize) -> Result<&NFAState, NFAError> {
         let state = self.states.get(id);
         match state {
-            Some(state) => state,
-            None => panic!("Invalid state index provided"),
+            Some(state) => Ok(state),
+            None => return Err(NFAError::InvalidIndexError),
         }
     }
 
-    fn set_accept_category(&mut self, category: String) {
+    fn set_accept_category(&mut self, category: String) -> Result<(), NFAError> {
         let accept_states = self.accept_states.clone();
 
         for state in accept_states.iter_ones() {
             let state = match self.states.get_mut(state) {
                 Some(state) => state,
-                None => panic!("Invalid state index provided"),
+                None => return Err(NFAError::InvalidIndexError),
             };
             let old_category = &state.category;
             if old_category.is_empty() {
                 state.category = category.clone();
             }
         }
+        Ok(())
     }
-
+    /// Get the regular expression that the NFA models
     pub fn get_regex(&self) -> &String {
         return &self.regex;
     }
 }
 
-fn parse_base_tree(tree: Base) -> NFA {
+fn parse_base_tree(tree: Base) -> Result<NFA> {
     match tree {
-        Base::Character(character) => NFA::literal_construction(character),
-        Base::EscapeCharacter(character) => NFA::escape_literal_construction(character),
+        Base::Character(character) => Ok(NFA::literal_construction(character)),
+        Base::EscapeCharacter(character) => match NFA::escape_literal_construction(character) {
+            Ok(character) => Ok(character),
+            Err(err) => {
+                let err = Report::new(err);
+                return Err(err);
+            }
+        },
         Base::Exp(regex) => {
             let regex = *regex;
             parse_regex_tree(regex)
@@ -450,63 +496,65 @@ fn parse_base_tree(tree: Base) -> NFA {
                 let char_nfa = NFA::literal_construction(char);
                 result = NFA::alternation(char_nfa, result);
             }
-            return result;
+            Ok(result)
         }
     }
 }
 
-fn parse_factor_tree(tree: Factor) -> NFA {
+fn parse_factor_tree(tree: Factor) -> Result<NFA> {
     match tree {
         Factor::SimpleFactor(base, quantifier) => {
-            let nfa = parse_base_tree(base);
+            let nfa = parse_base_tree(base)?;
             match quantifier {
-                None => nfa,
-                Some(quantifier) => NFA::closure(nfa, quantifier),
+                None => Ok(nfa),
+                Some(quantifier) => Ok(NFA::closure(nfa, quantifier)),
             }
         }
     }
 }
 
-fn parse_term_tree(tree: Term) -> NFA {
+fn parse_term_tree(tree: Term) -> Result<NFA> {
     match tree {
         Term::SimpleTerm(factor) => parse_factor_tree(factor),
         Term::ConcatTerm(rfactor, lterm) => {
             let lterm = *lterm;
-            let nfa1 = parse_term_tree(lterm);
-            let nfa2 = parse_factor_tree(rfactor);
-            NFA::concatenate(nfa1, nfa2)
+            let nfa1 = parse_term_tree(lterm)?;
+            let nfa2 = parse_factor_tree(rfactor)?;
+            Ok(NFA::concatenate(nfa1, nfa2))
         }
     }
 }
 
-fn parse_regex_tree(tree: RegEx) -> NFA {
+fn parse_regex_tree(tree: RegEx) -> Result<NFA> {
     match tree {
         RegEx::SimpleRegex(term) => parse_term_tree(term),
         RegEx::AlterRegex(lterm, rregex) => {
             let rregex = *rregex; // Unboxing the value
-            let nfa1 = parse_term_tree(lterm);
-            let nfa2 = parse_regex_tree(rregex);
-            NFA::alternation(nfa1, nfa2)
+            let nfa1 = parse_term_tree(lterm)?;
+            let nfa2 = parse_regex_tree(rregex)?;
+            Ok(NFA::alternation(nfa1, nfa2))
         }
     }
 }
 
+/// Apply Thomson construction algorithm to build an NFA for a given regular expression syntax
+/// tree. If save_nfa is set to true, the constructed NFA is saved as a jpg.
 pub fn construct_nfa(
     mut syntax_tree_list: VecDeque<(String, RegEx, String)>,
     save_nfa: bool,
-) -> NFA {
+) -> Result<NFA> {
     let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
 
-    let mut result = parse_regex_tree(syntax_tree);
+    let mut result = parse_regex_tree(syntax_tree)?;
     result.regex = regex.to_string();
 
-    result.set_accept_category(category);
+    result.set_accept_category(category).unwrap();
 
     while !syntax_tree_list.is_empty() {
         let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
-        let mut nfa = parse_regex_tree(syntax_tree);
+        let mut nfa = parse_regex_tree(syntax_tree)?;
         nfa.regex = regex.to_string();
-        nfa.set_accept_category(category);
+        nfa.set_accept_category(category).unwrap();
         let old_regex = result.regex.clone();
         result = NFA::alternation(result, nfa);
         let new_regex = format!("{old_regex}|{regex}");
@@ -517,5 +565,5 @@ pub fn construct_nfa(
         result.show_fa(&filename);
     }
 
-    result
+    Ok(result)
 }

@@ -100,6 +100,14 @@ impl FA for DFA {
     fn get_acceptor_states(&self) -> &BitVec<u8> {
         &self.accept_states
     }
+
+    fn get_state_transitions(&self, state_id: usize) -> Vec<(&Symbol, &usize)> {
+        let mut transition_list: Vec<(&Symbol, &usize)> = Vec::new();
+        for transition in self.states[state_id].transitions.iter() {
+            transition_list.push(transition);
+        }
+        return transition_list;
+    }
 }
 
 impl DFAState {
@@ -110,7 +118,7 @@ impl DFAState {
             category: String::new(),
         }
     }
-
+    /// Get a list of all outgoing transitions for the given state
     pub fn get_transitions(&self) -> &HashMap<Symbol, usize> {
         &self.transitions
     }
@@ -118,7 +126,8 @@ impl DFAState {
     fn set_category(&mut self, category: String) {
         self.category = category;
     }
-
+    /// Get the syntactic category which this DFA state accepts if it is an accept state. Otherwise it
+    /// returns an empty string.
     pub fn get_category(&self) -> &String {
         &self.category
     }
@@ -194,14 +203,12 @@ impl DFA {
         }
     }
 
+    /// Returns a reference to the DFA state whose id is provided
     pub fn get_state(&self, id: usize) -> &DFAState {
-        let state = self.states.get(id);
-        match state {
-            Some(state) => state,
-            None => panic!("Invalid state index provided"),
-        }
+        let state = self.states.get(id).unwrap();
+        return state;
     }
-
+    /// Returns a list of all states present in the DFA
     pub fn get_states(&self) -> Vec<DFAState> {
         self.states.clone()
     }
@@ -210,10 +217,7 @@ impl DFA {
         let accept_states = self.accept_states.clone();
 
         for accept_state in accept_states.iter_ones() {
-            let state = match self.states.get_mut(accept_state) {
-                Some(state) => state,
-                None => panic!("Invalid state index provided"),
-            };
+            let state = self.states.get_mut(accept_state).unwrap();
             let old_category = &state.category;
             if old_category.is_empty() {
                 state.set_category(category.clone());
@@ -232,12 +236,8 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
     let mut nfa_states: VecDeque<_> = nfa_states.iter_ones().collect();
 
     while !nfa_states.is_empty() {
-        let state = nfa_states.pop_front();
-        let state = match state {
-            Some(state) => state,
-            None => panic!("Trying to remove element from empty queue"),
-        };
-        let state = nfa.get_state(state);
+        let state = nfa_states.pop_front().unwrap();
+        let state = nfa.get_state(state).unwrap();
         let transitions = state.get_transitions();
 
         let eps_transitions = transitions.get(&Symbol::Epsilon);
@@ -264,7 +264,7 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
     let mut result = BitVec::repeat(false, q.len());
     let nodes: Vec<usize> = q.iter_ones().collect();
     for node in nodes {
-        let nfa_state = nfa.get_state(node);
+        let nfa_state = nfa.get_state(node).unwrap();
         let transitions = nfa_state.get_transitions();
         let target_state_ids = transitions.get(&Symbol::Char(c));
         let target_state_ids = match target_state_ids {
@@ -363,11 +363,7 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
                 continue;
             }
             let next_set = lookup_table.get_num_sets(); // The next set which will be inserted
-            let member_state_id = set.iter().next();
-            let member_state_id = match member_state_id {
-                Some(id) => id,
-                None => panic!("Trying to remove element from empty set!"),
-            };
+            let member_state_id = set.iter().next().unwrap();
 
             let member_state = dfa.get_state(*member_state_id);
 
@@ -436,11 +432,7 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
 
         let transitions = &state.transitions; // Get the transitions from the original state
 
-        let reorder_state: &mut DFAState = match result.states.get_mut(reorder_state_id) {
-            Some(state) => state,
-            None => panic!("Invalid state index provided"),
-        }; // Get the state from the
-           // re-ordered DFA
+        let reorder_state: &mut DFAState = result.states.get_mut(reorder_state_id).unwrap(); // Get the state from the re-ordered DFA
 
         for transition in transitions {
             // For each transition, check if the target state is
@@ -483,8 +475,9 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
 
     return result;
 }
-
-pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
+/// Apply Hopcroft's algorithm on a provided DFA to minimize it. If save_minimal_dfa is set to true,
+/// the constructed minimal DFA is saved as a jpg.
+pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
     let lookup_table = get_lookup_table(&dfa);
     let sets = lookup_table.set_to_states_map.values();
 
@@ -509,12 +502,7 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
 
     let start_state = dfa.start_state;
 
-    let start_set = lookup_table.state_to_set_map.get(&start_state);
-
-    let start_set = match start_set {
-        Some(set) => set,
-        None => panic!("Invalid set number provided!"),
-    };
+    let start_set = lookup_table.state_to_set_map.get(&start_state).unwrap();
 
     minimal_dfa.start_state = *start_set;
 
@@ -544,11 +532,10 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
 
         for transition in transitions {
             let destination_state = transition.1;
-            let destination_set = lookup_table.state_to_set_map.get(&destination_state);
-            let destination_set = match destination_set {
-                Some(set) => set,
-                None => panic!("Provided state does not exist in any set!"),
-            };
+            let destination_set = lookup_table
+                .state_to_set_map
+                .get(&destination_state)
+                .unwrap();
 
             minimal_dfa.states[*current_set]
                 .transitions
@@ -558,19 +545,20 @@ pub fn construct_minimal_dfa(dfa: DFA, save_minimal_dfa: bool) -> DFA {
 
     let regex = &minimal_dfa.regex;
 
+    let mut result = reorder_minimal_dfa(&minimal_dfa);
+    result.alphabet = minimal_dfa.alphabet.clone();
+    result.regex = regex.to_string();
+
     if save_minimal_dfa {
-        let mut result = reorder_minimal_dfa(&minimal_dfa);
-        result.alphabet = minimal_dfa.alphabet.clone();
-        result.regex = regex.to_string();
         let filename = format!("constructed_minimal_dfa");
         result.show_fa(&filename);
     }
 
-    return minimal_dfa; // We only need to re-arrange if we are saving, the scanner does not need
-                        // the DFA to be organized
+    return result; // We need to always reorder now as visualization is possible
 }
-
-pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
+///  Apply the subset construction algorithm on an NFA to build a DFA. If save_dfa is set to true,
+///  the constructed DFA is saved as a jpg.
+pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     let mut result = DFA::new(); // Create new DFA
     result.alphabet = nfa.get_alphabet().clone(); // DFA has same alphabet as NFA
 
@@ -596,7 +584,7 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
         result.accept_states.set(di, true);
 
         for state in q0.iter_ones() {
-            let category = nfa.get_state(state).get_category();
+            let category = nfa.get_state(state).unwrap().get_category();
             if !category.is_empty() {
                 result.set_accept_category(category);
             }
@@ -606,11 +594,7 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
     let dfa_alphabet = result.alphabet.clone();
 
     while !work_list.is_empty() {
-        let q = work_list.pop_front();
-        let q = match q {
-            Some(q) => q,
-            None => panic!("trying to pop empty list!"),
-        };
+        let q = work_list.pop_front().unwrap();
         for c in dfa_alphabet.iter() {
             let end_states = delta(&nfa, &q, *c);
             if end_states.not_any() {
@@ -627,7 +611,7 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
                 if has_common {
                     result.accept_states.set(di, true);
                     for state in t.iter_ones() {
-                        let category = nfa.get_state(state).get_category();
+                        let category = nfa.get_state(state).unwrap().get_category();
                         if !category.is_empty() {
                             result.set_accept_category(category);
                         }
@@ -635,16 +619,8 @@ pub fn construct_dfa(nfa: NFA, save_dfa: bool) -> DFA {
                 }
             }
             // add a transition from diq to dit
-            let dq = q_list.get(&q);
-            let dq = match dq {
-                Some(dq) => dq,
-                None => panic!("value not found in hash table"),
-            };
-            let di = q_list.get(&t);
-            let di = match di {
-                Some(di) => di,
-                None => panic!("value not found in hash table"),
-            };
+            let dq = q_list.get(&q).unwrap();
+            let di = q_list.get(&t).unwrap();
             let di = *di;
             let dq = *dq; // Unwrapping the box
             result.states[dq].transitions.insert(Symbol::Char(*c), di);

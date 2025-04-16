@@ -1,55 +1,12 @@
-use crate::reg_ex::RegEx;
 use clap::{Arg, Command};
-use std::collections::VecDeque;
-use std::fs::File;
-use std::io::{self, BufRead, BufReader};
-use std::path::PathBuf;
+use color_eyre::eyre::{Report, Result};
+use lexer::{
+    construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
+    read_microsyntax_file, visualize, LexerError,
+};
 
-mod dfa;
-mod fa;
-mod nfa;
-mod reg_ex;
-mod scanner;
-
-fn read_microsyntax_file(
-    file_path: PathBuf,
-) -> io::Result<(VecDeque<(String, String)>, VecDeque<String>)> {
-    let file = File::open(file_path);
-    let file = match file {
-        Ok(file) => file,
-        Err(error) => panic!("Error: Failed to open the microsyntax file {:?}", error),
-    };
-    let reader = BufReader::new(file);
-
-    let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
-
-    let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
-
-    for (line_number, line) in reader.lines().enumerate() {
-        let line = match line {
-            Ok(line) => line,
-            Err(error) => panic!(
-                "Error: Failed to read line number {:?} in microsyntaxes file! {:?}",
-                line_number, error
-            ),
-        };
-
-        let content: Vec<&str> = line.split("::").collect();
-
-        if content.len() != 2 {
-            panic!("Error: Malformed microsyntax file! Each file should contain only 2 :: separated values, the regex and the syntactic category described by the regex")
-        }
-
-        let pair = (content[0].to_string(), content[1].to_string());
-        regex_list.push_back(pair);
-
-        token_type_priority_list.push_back(content[1].to_string());
-    }
-
-    Ok((regex_list, token_type_priority_list))
-}
-
-fn main() {
+fn main() -> Result<()> {
+    color_eyre::install()?;
     let args = Command::new("lexer")
                         .version("1.0")
                         .author("Nagendra Kumar Jamadagni")
@@ -88,7 +45,7 @@ fn main() {
                                 .long("microsyntax-file")
                                 .help("Provide a file with a list of regular expressions and the corresponsing syntactic category name. The order of the list determines the priority of the regular expressions during token scanning")
                                 .value_name("MICROSYNTAX FILE")
-                                .value_parser(clap::value_parser!(PathBuf))
+                                .value_parser(clap::value_parser!(String))
                         )
                         .arg(
                             Arg::new("input")
@@ -96,7 +53,7 @@ fn main() {
                             .long("input")
                             .help("The program source file which should be scanned and tokenized")
                             .value_name("INPUT SOURCE FILE")
-                            .value_parser(clap::value_parser!(PathBuf))
+                            .value_parser(clap::value_parser!(String))
                             .required(true)
                         )
                         .arg(
@@ -105,7 +62,7 @@ fn main() {
                             .long("output")
                             .help("The output file to store the lexer's output")
                             .value_name("OUTPUT RESULT FILE")
-                            .value_parser(clap::value_parser!(PathBuf))
+                            .value_parser(clap::value_parser!(String))
                         )
                         .arg(
                             Arg::new("skip-whitespace")
@@ -116,51 +73,63 @@ fn main() {
                             .value_parser(clap::value_parser!(bool))
                             .num_args(1)
                         )
+                        .arg(
+                            Arg::new("visualize")
+                            .short('v')
+                            .long("visualize")
+                            .help("Visualize the finite automata graphs inside an interactive window that allows for zooming, panning and clicking of elements")
+                            .value_name("DFA, NFA, MINIMAL")
+                            .value_parser(clap::value_parser!(String))
+                            .num_args(1)
+                        )
+                        .arg(
+                            Arg::new("skip-categories")
+                            .short('s')
+                            .long("skip-categories")
+                            .help("Provide list of syntactic categories which can be skipped in the final lex output which is to be fed to the parser")
+                            .value_name("CATEGORY")
+                            .num_args(1)
+                            .value_parser(clap::value_parser!(String))
+                            .action(clap::ArgAction::Append)
+
+                        )
                         .get_matches();
 
-    let mut regex_list: VecDeque<(String, String)> = VecDeque::new();
+    let mut regex_list: Vec<(String, String)> = Vec::new();
 
-    let mut token_type_priority_list: VecDeque<String> = VecDeque::new();
-
-    if let Some(mst_file_path) = args.get_one::<PathBuf>("microsyntax-file") {
-        if mst_file_path.exists() {
-            let (rlist, _) = match read_microsyntax_file(mst_file_path.to_path_buf()) {
-                Ok((rlist, plist)) => (rlist, plist),
-                Err(error) => panic!("Error reading the microsyntax file {:?}", error),
-            };
-            regex_list = rlist;
-        } else {
-            panic!("Error: Provided file does not exist!");
-        }
+    if let Some(mst_file_path) = args.get_one::<String>("microsyntax-file") {
+        let rlist = read_microsyntax_file(mst_file_path.to_string())?;
+        regex_list = rlist;
     } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
             let value_vec: Vec<_> = value_group.collect();
-
             if value_vec.len() == 2 {
-                regex_list.push_back((value_vec[0].clone(), value_vec[1].clone()));
+                regex_list.push((value_vec[0].to_string(), value_vec[1].to_string()));
             } else {
-                panic!("Error: Both regex and syntactic category should be provided");
+                let err = Report::new(LexerError::RegexCategoryError);
+                return Err(err);
             }
-
-            token_type_priority_list.push_back(value_vec[1].clone());
         }
     } else {
-        panic!("Error: Either a microsyntax file or a list of microsyntaxes should be provided!");
+        let err = Report::new(LexerError::MissingMicrosyntaxError);
+        return Err(err);
     }
 
-    let src_file_path = match args.get_one::<PathBuf>("input") {
-        Some(file_path) => file_path,
-        None => panic!("Error: Input source file not provided!"),
-    };
-
-    let out_file_path = match args.get_one::<PathBuf>("output") {
-        Some(file_path) => file_path,
+    let src_file_path = match args.get_one::<String>("input") {
+        Some(file_path) => file_path.to_string(),
         None => {
-            let in_file_stem = src_file_path.file_stem().unwrap().to_str().unwrap();
-            let out_file_name = format!("{in_file_stem}.lex");
-            &PathBuf::from(out_file_name)
+            let err = Report::new(LexerError::InputMissingError);
+            return Err(err);
         }
     };
+
+    let out_file_path = args.get_one::<String>("output").cloned();
+
+    let mut skip_list: Vec<String> = Vec::new();
+
+    if let Some(values) = args.get_many::<String>("skip-categories") {
+        skip_list = values.cloned().collect();
+    }
 
     let save_nfa = args.get_flag("save-nfa");
 
@@ -173,26 +142,57 @@ fn main() {
         .copied()
         .unwrap_or(true);
 
-    let mut syntax_tree_list: VecDeque<(String, RegEx, String)> = VecDeque::new();
+    let visualize_opt = args.get_one::<String>("visualize");
 
-    while !regex_list.is_empty() {
-        let (regex, category) = regex_list.pop_front().unwrap();
+    let visualize_opt = match visualize_opt {
+        None => "none",
+        Some(str) => {
+            if str.eq_ignore_ascii_case("nfa") {
+                "nfa"
+            } else if str.eq_ignore_ascii_case("dfa") {
+                "dfa"
+            } else if str.eq_ignore_ascii_case("minimal") {
+                "minimal"
+            } else {
+                let err = Report::new(LexerError::WrongOptionError);
+                return Err(err);
+            }
+        }
+    };
 
-        let syntax_tree = reg_ex::build_syntax_tree(&regex);
+    let syntax_tree_list = parse_microsyntax_list(regex_list).unwrap();
 
-        syntax_tree_list.push_back((regex, syntax_tree, category));
+    let nfa = construct_nfa(syntax_tree_list, save_nfa).unwrap();
+
+    let dfa = construct_dfa(&nfa, save_dfa);
+    let minimal_dfa = construct_minimal_dfa(&dfa, save_minimal_dfa);
+
+    let scanner = construct_scanner(&minimal_dfa);
+
+    let token_list = scanner
+        .scan(
+            src_file_path,
+            out_file_path,
+            skip_whitespace,
+            Some(skip_list),
+        )
+        .unwrap();
+
+    for token in token_list {
+        println!(
+            "The token is {} and the category is {}",
+            token.get_token(),
+            token.get_category()
+        );
     }
 
-    let nfa = nfa::construct_nfa(syntax_tree_list, save_nfa);
+    if visualize_opt == "nfa" {
+        visualize(&nfa);
+    } else if visualize_opt == "dfa" {
+        visualize(&dfa);
+    } else if visualize_opt == "minimal" {
+        visualize(&minimal_dfa);
+    }
 
-    let dfa = dfa::construct_dfa(nfa, save_dfa);
-    let dfa = dfa::construct_minimal_dfa(dfa, save_minimal_dfa);
-
-    let scanner = scanner::construct_scanner(&dfa);
-
-    scanner.scan(
-        src_file_path.to_path_buf(),
-        out_file_path.to_path_buf(),
-        skip_whitespace,
-    );
+    Ok(())
 }

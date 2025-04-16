@@ -40,6 +40,14 @@ The different options as follows:
 
 - --save-minimal-dfa [-m] : Save the minimal DFA created after applying Hopcroft's algorithm to the DFA created previously. The minimized DFA here still has different terminal states for different syntactic categories, hence this is not the smallest possible DFA that can be created. This is done to help with token identification later when scanning the input. The minimal DFA is again stored in `.dot` and `.jpg` file formats.
 
+<br>
+
+- --skip-whitespace [-w] : If spaces are semantically meaningless in your language, you can enable this option and the scanner will ignore any whitespace characters detected in the input stream, even if no whitespace syntactic category is defined in your microsyntax file. *CAUTION* Currently this detects whitespaces even inside string constants, this needs to be addressed at a later time.
+
+<br>
+
+- --visualize [-v] : Visualize the finite automata created by the tool, takes one of NFA, DFA or MINIMAL as an option and opens an interactive window which shows the finite automata selected.
+
 # Example microsyntax file
 
 [0-9]+::NUMBER
@@ -65,3 +73,7 @@ add1|sub1|negate::KEYWORD
 
 ## Sample Minimal DFA
 ![Sample Minimized DFA file](./images/constructed_minimal_dfa.png)
+
+## Sample Visualization
+
+![Sample Visualization of FA](./images/fa_visualization.png)
