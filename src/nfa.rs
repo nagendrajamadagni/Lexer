@@ -477,7 +477,13 @@ impl NFA {
 fn parse_base_tree(tree: Base) -> NFA {
     match tree {
         Base::Character(character) => NFA::literal_construction(character),
-        Base::EscapeCharacter(character) => NFA::escape_literal_construction(character).unwrap(),
+        Base::EscapeCharacter(character) => match NFA::escape_literal_construction(character) {
+            Ok(character) => character,
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+        },
         Base::Exp(regex) => {
             let regex = *regex;
             parse_regex_tree(regex)
