@@ -66,7 +66,7 @@ impl std::fmt::Display for RegExError {
             RegExError::FileReadError(err_line) => write!(f, "{}", err_line),
             RegExError::InvalidCharacterRange(start, end) => write!(
                 f,
-                "Error: Invalid character range provided: {} = {}",
+                "Error: Invalid character range provided: {} - {}",
                 start, end
             ),
             RegExError::InvalidEscapeCharacter(ch) => {
