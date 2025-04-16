@@ -1,6 +1,7 @@
 /* Good resource for parsing regex at
  * https://matt.might.net/articles/parsing-regex-with-recursive-descent/ */
 
+use color_eyre::eyre::{Report, Result};
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::fs::File;
@@ -164,16 +165,17 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
     return Ok((char_set, new_start));
 }
 
-fn parse_base(regex: &str, start: usize) -> Result<(Base, usize), RegExError> {
+fn parse_base(regex: &str, start: usize) -> Result<(Base, usize)> {
     let nchar = regex.chars().nth(start);
     let nchar = match nchar {
         None => {
-            return Err(RegExError::InvalidRegexError(regex.to_string()));
+            let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
+            return Err(err);
         }
         Some(nchar) => nchar,
     };
     if nchar == '(' {
-        let (inner_regex, new_start) = parse_regex(regex, start + 1); // Consume the lparen
+        let (inner_regex, new_start) = parse_regex(regex, start + 1)?; // Consume the lparen
         let new_base = Base::Exp(Box::new(inner_regex));
         let new_start = new_start + 1; // Consume the rparen
         Ok((new_base, new_start))
@@ -181,8 +183,8 @@ fn parse_base(regex: &str, start: usize) -> Result<(Base, usize), RegExError> {
         let (char_set, new_start) = match parse_char_class(regex, start + 1) {
             Ok((char_set, new_start)) => (char_set, new_start),
             Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
+                let err = Report::new(err);
+                return Err(err);
             }
         };
         let new_start = new_start + 1; // Consume the rparen
@@ -197,18 +199,13 @@ fn parse_base(regex: &str, start: usize) -> Result<(Base, usize), RegExError> {
         let new_start = start + 1;
         Ok((new_base, new_start))
     } else {
-        return Err(RegExError::InvalidRegexError(regex.to_string()));
+        let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
+        return Err(err);
     }
 }
 
-fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
-    let (base, new_start) = match parse_base(regex, start) {
-        Ok((base, new_start)) => (base, new_start),
-        Err(error) => {
-            eprintln!("{}", error);
-            std::process::exit(1);
-        }
-    };
+fn parse_factor(regex: &str, start: usize) -> Result<(Factor, usize)> {
+    let (base, new_start) = parse_base(regex, start)?;
 
     let mut new_start = new_start;
     let quantifier = {
@@ -228,11 +225,11 @@ fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
         }
     };
     let term = Factor::SimpleFactor(base, quantifier);
-    (term, new_start)
+    Ok((term, new_start))
 }
 
-fn parse_term(regex: &str, start: usize) -> (Term, usize) {
-    let (factor, mut new_start) = parse_factor(regex, start);
+fn parse_term(regex: &str, start: usize) -> Result<(Term, usize)> {
+    let (factor, mut new_start) = parse_factor(regex, start)?;
 
     let mut prev_term = Term::SimpleTerm(factor);
 
@@ -241,59 +238,55 @@ fn parse_term(regex: &str, start: usize) -> (Term, usize) {
         if nchar == '|' || nchar == ')' {
             break;
         } else {
-            let (next_factor, tmp_start) = parse_factor(regex, new_start);
+            let (next_factor, tmp_start) = parse_factor(regex, new_start)?;
             let next_term = Term::ConcatTerm(next_factor, Box::new(prev_term));
             prev_term = next_term;
             new_start = tmp_start;
         }
     }
-    (prev_term, new_start)
+    Ok((prev_term, new_start))
 }
 
-fn parse_regex(regex: &str, start: usize) -> (RegEx, usize) {
-    let (term, new_start) = parse_term(regex, start);
+fn parse_regex(regex: &str, start: usize) -> Result<(RegEx, usize)> {
+    let (term, new_start) = parse_term(regex, start)?;
     if new_start >= regex.len() {
-        return (RegEx::SimpleRegex(term), new_start);
+        return Ok((RegEx::SimpleRegex(term), new_start));
     } else if regex.chars().nth(new_start).unwrap() == '|' {
-        let (next_regex, new_start) = parse_regex(regex, new_start + 1);
-        return (RegEx::AlterRegex(term, Box::new(next_regex)), new_start);
+        let (next_regex, new_start) = parse_regex(regex, new_start + 1)?;
+        return Ok((RegEx::AlterRegex(term, Box::new(next_regex)), new_start));
     } else {
-        return (RegEx::SimpleRegex(term), new_start);
+        return Ok((RegEx::SimpleRegex(term), new_start));
     }
 }
 
-fn build_syntax_tree(regex: &str) -> Result<RegEx, RegExError> {
+fn build_syntax_tree(regex: &str) -> Result<RegEx> {
     if !balanced_brackets(regex) {
-        return Err(RegExError::UnbalancedParenthesisError(regex.to_string()));
+        let err = Report::new(RegExError::UnbalancedParenthesisError(regex.to_string()));
+        return Err(err);
     }
 
     if regex.len() == 0 {
-        return Err(RegExError::InvalidRegexError(regex.to_string()));
+        let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
+        return Err(err);
     }
 
-    let (syntax_tree, _) = parse_regex(regex, 0);
+    let (syntax_tree, _) = parse_regex(regex, 0)?;
     return Ok(syntax_tree);
 }
 /// Parse a list of microsyntaxes provided and return the parse trees
 pub fn parse_microsyntax_list(
     regex_list: Vec<(String, String)>,
-) -> VecDeque<(String, RegEx, String)> {
+) -> Result<VecDeque<(String, RegEx, String)>> {
     let mut syntax_tree_list = VecDeque::new();
 
     for regex_entry in regex_list {
         let (regex, category) = regex_entry;
 
-        let syntax_tree = match build_syntax_tree(&regex) {
-            Ok(syntax_tree) => syntax_tree,
-            Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
-            }
-        };
+        let syntax_tree = build_syntax_tree(&regex)?;
 
         syntax_tree_list.push_back((regex, syntax_tree, category));
     }
-    return syntax_tree_list;
+    return Ok(syntax_tree_list);
 }
 /// Parse a file containing microsyntaxes and return the parse trees
 pub fn read_microsyntax_file(file_path: String) -> Result<Vec<(String, String)>, RegExError> {

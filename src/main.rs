@@ -1,10 +1,12 @@
 use clap::{Arg, Command};
+use color_eyre::eyre::{Report, Result};
 use lexer::{
     construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
     read_microsyntax_file, visualize, LexerError,
 };
 
-fn main() -> Result<(), LexerError> {
+fn main() -> Result<()> {
+    color_eyre::install()?;
     let args = Command::new("lexer")
                         .version("1.0")
                         .author("Nagendra Kumar Jamadagni")
@@ -96,8 +98,7 @@ fn main() -> Result<(), LexerError> {
     let mut regex_list: Vec<(String, String)> = Vec::new();
 
     if let Some(mst_file_path) = args.get_one::<String>("microsyntax-file") {
-        let rlist = read_microsyntax_file(mst_file_path.to_string())
-            .map_err(|_| LexerError::MicroSyntaxReadError)?;
+        let rlist = read_microsyntax_file(mst_file_path.to_string())?;
         regex_list = rlist;
     } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
@@ -105,16 +106,21 @@ fn main() -> Result<(), LexerError> {
             if value_vec.len() == 2 {
                 regex_list.push((value_vec[0].to_string(), value_vec[1].to_string()));
             } else {
-                return Err(LexerError::RegexCategoryError);
+                let err = Report::new(LexerError::RegexCategoryError);
+                return Err(err);
             }
         }
     } else {
-        return Err(LexerError::MissingMicrosyntaxError);
+        let err = Report::new(LexerError::MissingMicrosyntaxError);
+        return Err(err);
     }
 
     let src_file_path = match args.get_one::<String>("input") {
         Some(file_path) => file_path.to_string(),
-        None => return Err(LexerError::InputMissingError),
+        None => {
+            let err = Report::new(LexerError::InputMissingError);
+            return Err(err);
+        }
     };
 
     let out_file_path = args.get_one::<String>("output").cloned();
@@ -148,26 +154,29 @@ fn main() -> Result<(), LexerError> {
             } else if str.eq_ignore_ascii_case("minimal") {
                 "minimal"
             } else {
-                return Err(LexerError::WrongOptionError);
+                let err = Report::new(LexerError::WrongOptionError);
+                return Err(err);
             }
         }
     };
 
-    let syntax_tree_list = parse_microsyntax_list(regex_list);
+    let syntax_tree_list = parse_microsyntax_list(regex_list).unwrap();
 
-    let nfa = construct_nfa(syntax_tree_list, save_nfa);
+    let nfa = construct_nfa(syntax_tree_list, save_nfa).unwrap();
 
     let dfa = construct_dfa(&nfa, save_dfa);
     let minimal_dfa = construct_minimal_dfa(&dfa, save_minimal_dfa);
 
     let scanner = construct_scanner(&minimal_dfa);
 
-    let token_list = scanner.scan(
-        src_file_path,
-        out_file_path,
-        skip_whitespace,
-        Some(skip_list),
-    );
+    let token_list = scanner
+        .scan(
+            src_file_path,
+            out_file_path,
+            skip_whitespace,
+            Some(skip_list),
+        )
+        .unwrap();
 
     for token in token_list {
         println!(

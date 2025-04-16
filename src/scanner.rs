@@ -6,6 +6,7 @@ use bitvec::vec::BitVec;
 
 use crate::dfa::DFA;
 use crate::fa::{Symbol, FA};
+use color_eyre::eyre::{Report, Result};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fs::File;
@@ -392,7 +393,7 @@ impl Scanner {
         out_file: Option<String>,
         skip_whitespace: bool,
         skip_list: Option<Vec<String>>,
-    ) -> Vec<Token> {
+    ) -> Result<Vec<Token>> {
         let source_file = PathBuf::from(source_file);
 
         let write_to_file = out_file.is_some();
@@ -414,8 +415,8 @@ impl Scanner {
             let next_word = match self.next_word(&mut buffer, skip_whitespace) {
                 Ok(word) => word,
                 Err(err) => {
-                    eprintln!("{}", err);
-                    std::process::exit(1);
+                    let err = Report::new(err);
+                    return Err(err);
                 }
             };
 
@@ -434,7 +435,7 @@ impl Scanner {
                 let _ = writeln!(out_file, "{}", output_line).unwrap();
             }
         }
-        return token_list;
+        Ok(token_list)
     }
 
     #[allow(dead_code)]

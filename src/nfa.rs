@@ -1,4 +1,5 @@
 use bitvec::prelude::*;
+use color_eyre::eyre::{Report, Result};
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -474,14 +475,14 @@ impl NFA {
     }
 }
 
-fn parse_base_tree(tree: Base) -> NFA {
+fn parse_base_tree(tree: Base) -> Result<NFA> {
     match tree {
-        Base::Character(character) => NFA::literal_construction(character),
+        Base::Character(character) => Ok(NFA::literal_construction(character)),
         Base::EscapeCharacter(character) => match NFA::escape_literal_construction(character) {
-            Ok(character) => character,
+            Ok(character) => Ok(character),
             Err(err) => {
-                eprintln!("{}", err);
-                std::process::exit(1);
+                let err = Report::new(err);
+                return Err(err);
             }
         },
         Base::Exp(regex) => {
@@ -495,43 +496,43 @@ fn parse_base_tree(tree: Base) -> NFA {
                 let char_nfa = NFA::literal_construction(char);
                 result = NFA::alternation(char_nfa, result);
             }
-            return result;
+            Ok(result)
         }
     }
 }
 
-fn parse_factor_tree(tree: Factor) -> NFA {
+fn parse_factor_tree(tree: Factor) -> Result<NFA> {
     match tree {
         Factor::SimpleFactor(base, quantifier) => {
-            let nfa = parse_base_tree(base);
+            let nfa = parse_base_tree(base)?;
             match quantifier {
-                None => nfa,
-                Some(quantifier) => NFA::closure(nfa, quantifier),
+                None => Ok(nfa),
+                Some(quantifier) => Ok(NFA::closure(nfa, quantifier)),
             }
         }
     }
 }
 
-fn parse_term_tree(tree: Term) -> NFA {
+fn parse_term_tree(tree: Term) -> Result<NFA> {
     match tree {
         Term::SimpleTerm(factor) => parse_factor_tree(factor),
         Term::ConcatTerm(rfactor, lterm) => {
             let lterm = *lterm;
-            let nfa1 = parse_term_tree(lterm);
-            let nfa2 = parse_factor_tree(rfactor);
-            NFA::concatenate(nfa1, nfa2)
+            let nfa1 = parse_term_tree(lterm)?;
+            let nfa2 = parse_factor_tree(rfactor)?;
+            Ok(NFA::concatenate(nfa1, nfa2))
         }
     }
 }
 
-fn parse_regex_tree(tree: RegEx) -> NFA {
+fn parse_regex_tree(tree: RegEx) -> Result<NFA> {
     match tree {
         RegEx::SimpleRegex(term) => parse_term_tree(term),
         RegEx::AlterRegex(lterm, rregex) => {
             let rregex = *rregex; // Unboxing the value
-            let nfa1 = parse_term_tree(lterm);
-            let nfa2 = parse_regex_tree(rregex);
-            NFA::alternation(nfa1, nfa2)
+            let nfa1 = parse_term_tree(lterm)?;
+            let nfa2 = parse_regex_tree(rregex)?;
+            Ok(NFA::alternation(nfa1, nfa2))
         }
     }
 }
@@ -541,17 +542,17 @@ fn parse_regex_tree(tree: RegEx) -> NFA {
 pub fn construct_nfa(
     mut syntax_tree_list: VecDeque<(String, RegEx, String)>,
     save_nfa: bool,
-) -> NFA {
+) -> Result<NFA> {
     let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
 
-    let mut result = parse_regex_tree(syntax_tree);
+    let mut result = parse_regex_tree(syntax_tree)?;
     result.regex = regex.to_string();
 
     result.set_accept_category(category).unwrap();
 
     while !syntax_tree_list.is_empty() {
         let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
-        let mut nfa = parse_regex_tree(syntax_tree);
+        let mut nfa = parse_regex_tree(syntax_tree)?;
         nfa.regex = regex.to_string();
         nfa.set_accept_category(category).unwrap();
         let old_regex = result.regex.clone();
@@ -564,5 +565,5 @@ pub fn construct_nfa(
         result.show_fa(&filename);
     }
 
-    result
+    Ok(result)
 }
