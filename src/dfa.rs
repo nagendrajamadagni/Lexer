@@ -205,11 +205,8 @@ impl DFA {
 
     /// Returns a reference to the DFA state whose id is provided
     pub fn get_state(&self, id: usize) -> &DFAState {
-        let state = self.states.get(id);
-        match state {
-            Some(state) => state,
-            None => panic!("Invalid state index provided"),
-        }
+        let state = self.states.get(id).unwrap();
+        return state;
     }
     /// Returns a list of all states present in the DFA
     pub fn get_states(&self) -> Vec<DFAState> {
@@ -220,10 +217,7 @@ impl DFA {
         let accept_states = self.accept_states.clone();
 
         for accept_state in accept_states.iter_ones() {
-            let state = match self.states.get_mut(accept_state) {
-                Some(state) => state,
-                None => panic!("Invalid state index provided"),
-            };
+            let state = self.states.get_mut(accept_state).unwrap();
             let old_category = &state.category;
             if old_category.is_empty() {
                 state.set_category(category.clone());
@@ -242,11 +236,7 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
     let mut nfa_states: VecDeque<_> = nfa_states.iter_ones().collect();
 
     while !nfa_states.is_empty() {
-        let state = nfa_states.pop_front();
-        let state = match state {
-            Some(state) => state,
-            None => panic!("Trying to remove element from empty queue"),
-        };
+        let state = nfa_states.pop_front().unwrap();
         let state = nfa.get_state(state).unwrap();
         let transitions = state.get_transitions();
 
@@ -373,11 +363,7 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
                 continue;
             }
             let next_set = lookup_table.get_num_sets(); // The next set which will be inserted
-            let member_state_id = set.iter().next();
-            let member_state_id = match member_state_id {
-                Some(id) => id,
-                None => panic!("Trying to remove element from empty set!"),
-            };
+            let member_state_id = set.iter().next().unwrap();
 
             let member_state = dfa.get_state(*member_state_id);
 
@@ -446,11 +432,7 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
 
         let transitions = &state.transitions; // Get the transitions from the original state
 
-        let reorder_state: &mut DFAState = match result.states.get_mut(reorder_state_id) {
-            Some(state) => state,
-            None => panic!("Invalid state index provided"),
-        }; // Get the state from the
-           // re-ordered DFA
+        let reorder_state: &mut DFAState = result.states.get_mut(reorder_state_id).unwrap(); // Get the state from the re-ordered DFA
 
         for transition in transitions {
             // For each transition, check if the target state is
@@ -520,12 +502,7 @@ pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
 
     let start_state = dfa.start_state;
 
-    let start_set = lookup_table.state_to_set_map.get(&start_state);
-
-    let start_set = match start_set {
-        Some(set) => set,
-        None => panic!("Invalid set number provided!"),
-    };
+    let start_set = lookup_table.state_to_set_map.get(&start_state).unwrap();
 
     minimal_dfa.start_state = *start_set;
 
@@ -555,11 +532,10 @@ pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
 
         for transition in transitions {
             let destination_state = transition.1;
-            let destination_set = lookup_table.state_to_set_map.get(&destination_state);
-            let destination_set = match destination_set {
-                Some(set) => set,
-                None => panic!("Provided state does not exist in any set!"),
-            };
+            let destination_set = lookup_table
+                .state_to_set_map
+                .get(&destination_state)
+                .unwrap();
 
             minimal_dfa.states[*current_set]
                 .transitions
@@ -618,11 +594,7 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     let dfa_alphabet = result.alphabet.clone();
 
     while !work_list.is_empty() {
-        let q = work_list.pop_front();
-        let q = match q {
-            Some(q) => q,
-            None => panic!("trying to pop empty list!"),
-        };
+        let q = work_list.pop_front().unwrap();
         for c in dfa_alphabet.iter() {
             let end_states = delta(&nfa, &q, *c);
             if end_states.not_any() {
@@ -647,16 +619,8 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
                 }
             }
             // add a transition from diq to dit
-            let dq = q_list.get(&q);
-            let dq = match dq {
-                Some(dq) => dq,
-                None => panic!("value not found in hash table"),
-            };
-            let di = q_list.get(&t);
-            let di = match di {
-                Some(di) => di,
-                None => panic!("value not found in hash table"),
-            };
+            let dq = q_list.get(&q).unwrap();
+            let di = q_list.get(&t).unwrap();
             let di = *di;
             let dq = *dq; // Unwrapping the box
             result.states[dq].transitions.insert(Symbol::Char(*c), di);
