@@ -11,6 +11,8 @@
 //! - Scan and tokenize input based on the constructed automata
 //! - Visualize the automata state machine
 
+use std::{error, fmt};
+
 // Re-export the modules
 pub mod dfa;
 pub mod fa;
@@ -25,3 +27,36 @@ pub use nfa::construct_nfa;
 pub use reg_ex::{parse_microsyntax_list, read_microsyntax_file};
 pub use scanner::construct_scanner;
 pub use visualizer::visualize;
+
+// List of all possible Lexer Error Codes
+
+#[derive(Debug)]
+pub enum LexerError {
+    MicroSyntaxReadError,
+    RegexCategoryError,
+    InputMissingError,
+    WrongOptionError,
+    MissingMicrosyntaxError,
+}
+
+impl fmt::Display for LexerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MicroSyntaxReadError => {
+                write!(f, "Error: Failed to read the microsyntax file provided!")
+            }
+            Self::RegexCategoryError => write!(
+                f,
+                "Error: The number of arguments provided for the microsyntax entry is incorrect!",
+            ),
+            Self::InputMissingError => write!(f, "Error: Input source file missing!"),
+            Self::WrongOptionError => write!(f, "Error: Wrong option provided!"),
+            Self::MissingMicrosyntaxError => write!(
+                f,
+                "Error: No microsyntax file or microsyntax list provided!"
+            ),
+        }
+    }
+}
+
+impl error::Error for LexerError {}

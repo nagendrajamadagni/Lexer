@@ -1,10 +1,10 @@
 use clap::{Arg, Command};
 use lexer::{
     construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
-    read_microsyntax_file, visualize,
+    read_microsyntax_file, visualize, LexerError,
 };
 
-fn main() {
+fn main() -> Result<(), LexerError> {
     let args = Command::new("lexer")
                         .version("1.0")
                         .author("Nagendra Kumar Jamadagni")
@@ -96,10 +96,8 @@ fn main() {
     let mut regex_list: Vec<(String, String)> = Vec::new();
 
     if let Some(mst_file_path) = args.get_one::<String>("microsyntax-file") {
-        let rlist = match read_microsyntax_file(mst_file_path.to_string()) {
-            Ok(rlist) => rlist,
-            Err(error) => panic!("Error reading the microsyntax file {:?}", error),
-        };
+        let rlist = read_microsyntax_file(mst_file_path.to_string())
+            .map_err(|e| LexerError::MicroSyntaxReadError)?;
         regex_list = rlist;
     } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
@@ -107,16 +105,16 @@ fn main() {
             if value_vec.len() == 2 {
                 regex_list.push((value_vec[0].to_string(), value_vec[1].to_string()));
             } else {
-                panic!("Error: Both regex and syntactic category should be provided");
+                return Err(LexerError::RegexCategoryError);
             }
         }
     } else {
-        panic!("Error: Either a microsyntax file or a list of microsyntaxes should be provided!");
+        return Err(LexerError::MissingMicrosyntaxError);
     }
 
     let src_file_path = match args.get_one::<String>("input") {
         Some(file_path) => file_path.to_string(),
-        None => panic!("Error: Input source file not provided!"),
+        None => return Err(LexerError::InputMissingError),
     };
 
     let out_file_path = args.get_one::<String>("output").cloned();
@@ -150,7 +148,7 @@ fn main() {
             } else if str.eq_ignore_ascii_case("minimal") {
                 "minimal"
             } else {
-                panic!("visualize should be one of NFA | DFA | MINIMAL")
+                return Err(LexerError::WrongOptionError);
             }
         }
     };
@@ -186,4 +184,6 @@ fn main() {
     } else if visualize_opt == "minimal" {
         visualize(&minimal_dfa);
     }
+
+    Ok(())
 }
