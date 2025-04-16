@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -38,6 +38,45 @@ pub enum RegEx {
     SimpleRegex(Term),
     AlterRegex(Term, Box<RegEx>),
 }
+
+#[derive(Debug)]
+pub enum RegExError {
+    MalformedMicrosyntaxError(String),
+    InvalidRegexError(String),
+    UnbalancedParenthesisError(String),
+    FileOpenError(String),
+    FileReadError(String),
+    InvalidCharacterRange(char, char),
+    InvalidEscapeCharacter(char),
+}
+
+impl std::fmt::Display for RegExError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RegExError::UnbalancedParenthesisError(regex) => {
+                write!(f, "Error: {} has unbalanced parenthesis!", regex)
+            }
+            RegExError::InvalidRegexError(regex) => {
+                write!(f, "Error: Invalid regex provided: {}", regex)
+            }
+            RegExError::MalformedMicrosyntaxError(regex) => {
+                write!(f, "Error: Malformed microsyntax entry detected: {}", regex)
+            }
+            RegExError::FileOpenError(err_line) => write!(f, "{}", err_line),
+            RegExError::FileReadError(err_line) => write!(f, "{}", err_line),
+            RegExError::InvalidCharacterRange(start, end) => write!(
+                f,
+                "Error: Invalid character range provided: {} = {}",
+                start, end
+            ),
+            RegExError::InvalidEscapeCharacter(ch) => {
+                write!(f, "Error: Invalid escape character {}  provided!", ch)
+            }
+        }
+    }
+}
+
+impl std::error::Error for RegExError {}
 
 fn balanced_brackets(reg_ex: &str) -> bool {
     let mut stack = Vec::new();
@@ -78,7 +117,7 @@ fn nchar_is_valid(nchar: char) -> bool {
     }
 }
 
-fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
+fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize), RegExError> {
     let mut new_start = start;
     let mut char_set: HashSet<char> = HashSet::new();
 
@@ -87,7 +126,7 @@ fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
             let char_start = regex.chars().nth(new_start).unwrap();
             let char_end = regex.chars().nth(new_start + 2).unwrap();
             if char_end < char_start {
-                panic!("Invalid character range provided");
+                return Err(RegExError::InvalidCharacterRange(char_start, char_end));
             }
             for char in char_start..=char_end {
                 char_set.insert(char);
@@ -108,7 +147,11 @@ fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
                     '*' => char_set.insert('*'),
                     '+' => char_set.insert('+'),
                     '?' => char_set.insert('?'),
-                    _ => panic!("Invalid escape character provided"),
+                    _ => {
+                        return Err(RegExError::InvalidEscapeCharacter(
+                            regex.chars().nth(new_start + 1).unwrap(),
+                        ))
+                    }
                 };
                 new_start = new_start + 2;
             } else {
@@ -118,40 +161,54 @@ fn parse_char_class(regex: &str, start: usize) -> (HashSet<char>, usize) {
         }
     }
 
-    return (char_set, new_start);
+    return Ok((char_set, new_start));
 }
 
-fn parse_base(regex: &str, start: usize) -> (Base, usize) {
+fn parse_base(regex: &str, start: usize) -> Result<(Base, usize), RegExError> {
     let nchar = regex.chars().nth(start);
     let nchar = match nchar {
-        None => panic!("Invalid regex provided"),
+        None => {
+            return Err(RegExError::InvalidRegexError(regex.to_string()));
+        }
         Some(nchar) => nchar,
     };
     if nchar == '(' {
         let (inner_regex, new_start) = parse_regex(regex, start + 1); // Consume the lparen
         let new_base = Base::Exp(Box::new(inner_regex));
         let new_start = new_start + 1; // Consume the rparen
-        (new_base, new_start)
+        Ok((new_base, new_start))
     } else if nchar == '[' {
-        let (char_set, new_start) = parse_char_class(regex, start + 1);
+        let (char_set, new_start) = match parse_char_class(regex, start + 1) {
+            Ok((char_set, new_start)) => (char_set, new_start),
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+        };
         let new_start = new_start + 1; // Consume the rparen
         let new_base = Base::CharSet(char_set);
-        (new_base, new_start)
+        Ok((new_base, new_start))
     } else if nchar == '\\' {
         let new_base = Base::EscapeCharacter(regex.chars().nth(start + 1).unwrap());
         let new_start = start + 2;
-        (new_base, new_start)
+        Ok((new_base, new_start))
     } else if nchar_is_valid(nchar) {
         let new_base = Base::Character(nchar);
         let new_start = start + 1;
-        (new_base, new_start)
+        Ok((new_base, new_start))
     } else {
-        panic!("Invalid regex provided!{} is not valid", regex);
+        return Err(RegExError::InvalidRegexError(regex.to_string()));
     }
 }
 
 fn parse_factor(regex: &str, start: usize) -> (Factor, usize) {
-    let (base, new_start) = parse_base(regex, start);
+    let (base, new_start) = match parse_base(regex, start) {
+        Ok((base, new_start)) => (base, new_start),
+        Err(error) => {
+            eprintln!("{}", error);
+            std::process::exit(1);
+        }
+    };
 
     let mut new_start = new_start;
     let quantifier = {
@@ -205,17 +262,17 @@ fn parse_regex(regex: &str, start: usize) -> (RegEx, usize) {
     }
 }
 
-fn build_syntax_tree(regex: &str) -> RegEx {
+fn build_syntax_tree(regex: &str) -> Result<RegEx, RegExError> {
     if !balanced_brackets(regex) {
-        panic!("The provided regular expression has unbalanced parentheses");
+        return Err(RegExError::UnbalancedParenthesisError(regex.to_string()));
     }
 
     if regex.len() == 0 {
-        panic!("Empty regex provided");
+        return Err(RegExError::InvalidRegexError(regex.to_string()));
     }
 
     let (syntax_tree, _) = parse_regex(regex, 0);
-    return syntax_tree;
+    return Ok(syntax_tree);
 }
 /// Parse a list of microsyntaxes provided and return the parse trees
 pub fn parse_microsyntax_list(
@@ -226,24 +283,29 @@ pub fn parse_microsyntax_list(
     for regex_entry in regex_list {
         let (regex, category) = regex_entry;
 
-        let syntax_tree = build_syntax_tree(&regex);
+        let syntax_tree = match build_syntax_tree(&regex) {
+            Ok(syntax_tree) => syntax_tree,
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+        };
 
         syntax_tree_list.push_back((regex, syntax_tree, category));
     }
     return syntax_tree_list;
 }
 /// Parse a file containing microsyntaxes and return the parse trees
-pub fn read_microsyntax_file(file_path: String) -> io::Result<Vec<(String, String)>> {
+pub fn read_microsyntax_file(file_path: String) -> Result<Vec<(String, String)>, RegExError> {
     let file_path = PathBuf::from(file_path);
-
-    if !file_path.exists() {
-        panic!("Error: Provided file does not exist!");
-    }
 
     let file = File::open(file_path);
     let file = match file {
         Ok(file) => file,
-        Err(error) => panic!("Error: Failed to open the microsyntax file {:?}", error),
+        Err(error) => {
+            let err_line = format!("Error: Failed to open the microsyntax file {}", error);
+            return Err(RegExError::FileOpenError(err_line));
+        }
     };
     let reader = BufReader::new(file);
 
@@ -252,16 +314,21 @@ pub fn read_microsyntax_file(file_path: String) -> io::Result<Vec<(String, Strin
     for (line_number, line) in reader.lines().enumerate() {
         let line = match line {
             Ok(line) => line,
-            Err(error) => panic!(
-                "Error: Failed to read line number {:?} in microsyntaxes file! {:?}",
-                line_number, error
-            ),
+            Err(error) => {
+                let err_line = format!(
+                    "Error: Failed to read line number {} in microsyntaxes file {}",
+                    line_number, error
+                );
+                return Err(RegExError::FileReadError(err_line));
+            }
         };
 
         let content: Vec<&str> = line.split("::").collect();
 
         if content.len() != 2 {
-            panic!("Error: Malformed microsyntax file! Each line should contain only 2 :: separated values, the regex and the syntactic category described by the regex. Invalid line {:?}", content[0])
+            return Err(RegExError::MalformedMicrosyntaxError(
+                content[0].to_string(),
+            ));
         }
 
         let lhs = content[0];
