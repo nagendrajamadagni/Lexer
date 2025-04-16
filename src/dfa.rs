@@ -247,7 +247,7 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
             Some(state) => state,
             None => panic!("Trying to remove element from empty queue"),
         };
-        let state = nfa.get_state(state);
+        let state = nfa.get_state(state).unwrap();
         let transitions = state.get_transitions();
 
         let eps_transitions = transitions.get(&Symbol::Epsilon);
@@ -274,7 +274,7 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
     let mut result = BitVec::repeat(false, q.len());
     let nodes: Vec<usize> = q.iter_ones().collect();
     for node in nodes {
-        let nfa_state = nfa.get_state(node);
+        let nfa_state = nfa.get_state(node).unwrap();
         let transitions = nfa_state.get_transitions();
         let target_state_ids = transitions.get(&Symbol::Char(c));
         let target_state_ids = match target_state_ids {
@@ -608,7 +608,7 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
         result.accept_states.set(di, true);
 
         for state in q0.iter_ones() {
-            let category = nfa.get_state(state).get_category();
+            let category = nfa.get_state(state).unwrap().get_category();
             if !category.is_empty() {
                 result.set_accept_category(category);
             }
@@ -639,7 +639,7 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
                 if has_common {
                     result.accept_states.set(di, true);
                     for state in t.iter_ones() {
-                        let category = nfa.get_state(state).get_category();
+                        let category = nfa.get_state(state).unwrap().get_category();
                         if !category.is_empty() {
                             result.set_accept_category(category);
                         }

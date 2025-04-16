@@ -2,6 +2,8 @@ use bitvec::prelude::*;
 use petgraph::dot::Dot;
 use petgraph::graph::DiGraph;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::error;
+use std::fmt;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -9,6 +11,25 @@ use std::process::Command;
 
 use crate::fa::{Symbol, FA};
 use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
+
+#[derive(Debug)]
+pub enum NFAError {
+    InvalidEscapeCharError(char),
+    InvalidIndexError,
+}
+
+impl fmt::Display for NFAError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NFAError::InvalidEscapeCharError(ch) => {
+                write!(f, "Error: Invalid escape character {} provided!", ch)
+            }
+            NFAError::InvalidIndexError => write!(f, "Error: Invalid index provided!"),
+        }
+    }
+}
+
+impl error::Error for NFAError {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NFAState {
@@ -390,7 +411,7 @@ impl NFA {
         return result;
     }
 
-    fn escape_literal_construction(character: char) -> NFA {
+    fn escape_literal_construction(character: char) -> Result<NFA, NFAError> {
         let mut result: NFA = NFA::new();
         let start_state = result.add_state();
         let end_state = result.add_state();
@@ -408,7 +429,7 @@ impl NFA {
             '*' => '*',
             '+' => '+',
             '?' => '?',
-            _ => panic!("Invalid escape cahracter found {}!", character),
+            _ => return Err(NFAError::InvalidEscapeCharError(character)),
         };
 
         result.alphabet.insert(escape_character);
@@ -421,30 +442,31 @@ impl NFA {
         result.start_state = start_state;
         result.accept_states.set(end_state, true);
 
-        return result;
+        return Ok(result);
     }
     /// Get the state for the provided id
-    pub fn get_state(&self, id: usize) -> &NFAState {
+    pub fn get_state(&self, id: usize) -> Result<&NFAState, NFAError> {
         let state = self.states.get(id);
         match state {
-            Some(state) => state,
-            None => panic!("Invalid state index provided"),
+            Some(state) => Ok(state),
+            None => return Err(NFAError::InvalidIndexError),
         }
     }
 
-    fn set_accept_category(&mut self, category: String) {
+    fn set_accept_category(&mut self, category: String) -> Result<(), NFAError> {
         let accept_states = self.accept_states.clone();
 
         for state in accept_states.iter_ones() {
             let state = match self.states.get_mut(state) {
                 Some(state) => state,
-                None => panic!("Invalid state index provided"),
+                None => return Err(NFAError::InvalidIndexError),
             };
             let old_category = &state.category;
             if old_category.is_empty() {
                 state.category = category.clone();
             }
         }
+        Ok(())
     }
     /// Get the regular expression that the NFA models
     pub fn get_regex(&self) -> &String {
@@ -455,7 +477,7 @@ impl NFA {
 fn parse_base_tree(tree: Base) -> NFA {
     match tree {
         Base::Character(character) => NFA::literal_construction(character),
-        Base::EscapeCharacter(character) => NFA::escape_literal_construction(character),
+        Base::EscapeCharacter(character) => NFA::escape_literal_construction(character).unwrap(),
         Base::Exp(regex) => {
             let regex = *regex;
             parse_regex_tree(regex)
