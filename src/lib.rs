@@ -32,10 +32,15 @@ pub use visualizer::visualize;
 
 #[derive(Debug)]
 pub enum LexerError {
+    /// Error when trying to read the microsyntax
     MicroSyntaxReadError,
+    /// Error when trying to parse the regex and its category from the list of microsyntaxes
     RegexCategoryError,
+    /// Error when trying read the input to scan into tokens
     InputMissingError,
+    /// Error when trying to parse an option for the binary
     WrongOptionError,
+    //// Error when trying to look for microsyntax file
     MissingMicrosyntaxError,
 }
 
