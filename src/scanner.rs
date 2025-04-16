@@ -411,7 +411,13 @@ impl Scanner {
         }
 
         while !buffer.is_eof() {
-            let next_word = self.next_word(&mut buffer, skip_whitespace).unwrap();
+            let next_word = match self.next_word(&mut buffer, skip_whitespace) {
+                Ok(word) => word,
+                Err(err) => {
+                    eprintln!("{}", err);
+                    std::process::exit(1);
+                }
+            };
 
             if skip_set.contains(&next_word.1) {
                 continue;
