@@ -1,4 +1,4 @@
-/* Implementation of Maximal Munch Table Scanner. Given a sequence of text, this scanner should
+/* Implementation of Maximal Munch Table Scanner. Given a sequence of text, this scanne should
  * detect the regex specified in the micro-syntax for a given syntactic grouping. Then we output
  * the position where the lexeme was found and classify it into a syntactic grouping. */
 
@@ -53,6 +53,7 @@ struct Buffer {
     input_ptr: usize,
     fence: usize,
     buf_reader: BufReader<File>,
+    fill_end: usize,
 }
 
 impl Buffer {
@@ -65,6 +66,7 @@ impl Buffer {
             fence: 0,
             source_buffer: [0; 1024],
             buf_reader,
+            fill_end: 0,
         };
 
         buffer.fill_buffer(0, buffer.source_buffer.len() / 2);
@@ -74,19 +76,50 @@ impl Buffer {
     fn fill_buffer(&mut self, start: usize, end: usize) {
         assert!(end > start);
         assert!(end - start == self.source_buffer.len() / 2);
-        let _ = self
+        let bytes_read = self
             .buf_reader
             .read(&mut self.source_buffer[start..end])
             .unwrap();
+
+        if bytes_read < end - start {
+            // We reached the EOF and cannot read anymore, mark the EOF
+            // in the circular buffer as well.
+
+            self.source_buffer[start + bytes_read] = 0;
+        }
+
+        self.fill_end = end % self.source_buffer.len();
+        //TODO create an error called fill error and propagate it
     }
 
     fn rollback(&mut self, amount: usize) -> Result<()> {
-        if self.input_ptr - amount <= self.fence {
+        if amount > self.source_buffer.len() {
+            // If we try to rollback more than the buffer
+            // length, throw an error
             let err = Report::new(BufferError::RollbackError);
             return Err(err);
         }
 
-        self.input_ptr = (self.input_ptr - amount) % self.source_buffer.len();
+        let final_cursor_position = if amount <= self.input_ptr {
+            self.input_ptr - amount
+        } else {
+            self.input_ptr + self.source_buffer.len() - amount
+        }; // Calculate the final cursor position after rollback
+        println!(
+            "Trying to rollback {} from {} to final position {}",
+            amount, self.input_ptr, final_cursor_position
+        );
+
+        if amount > self.input_ptr && final_cursor_position <= self.fence {
+            println!(
+                "The input ptr is {} and the fence is {} so cannot rollback!",
+                self.input_ptr, self.fence
+            );
+            let err = Report::new(BufferError::RollbackError);
+            return Err(err);
+        }
+
+        self.input_ptr = final_cursor_position;
         Ok(())
     }
 
@@ -97,7 +130,7 @@ impl Buffer {
 
         self.input_ptr = (self.input_ptr + 1) % two_n;
 
-        if self.input_ptr % n == 0 {
+        if self.input_ptr == self.fill_end {
             self.fill_buffer(self.input_ptr, self.input_ptr + n);
             self.fence = (self.input_ptr + n) % two_n;
         }
@@ -454,4 +487,119 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
     scanner.init_token_type_table(dfa);
 
     return scanner;
+}
+
+#[cfg(test)]
+
+mod buffer_test_helpers {
+
+    use super::Buffer;
+    use std::path::PathBuf;
+
+    pub fn setup_buffer(file: String) -> Buffer {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+
+        let mut test_file_path = PathBuf::from(manifest_dir);
+        test_file_path.push(format!("test_data/{file}"));
+
+        let test_buffer = Buffer::new(test_file_path).unwrap();
+
+        test_buffer
+    }
+}
+
+#[cfg(test)]
+mod buffer_tests {
+    use crate::scanner::{buffer_test_helpers::setup_buffer, BufferError};
+
+    #[test]
+    fn test_buffer_fill() {
+        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+        let mut contents = String::new();
+
+        for _ in 0..11 {
+            let ch = test_buffer.next_char();
+            contents.push(ch);
+        }
+
+        assert!(contents == "Lorem ipsum");
+    }
+
+    #[test]
+    fn test_buffer_rollback() {
+        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+
+        let mut contents = String::new();
+
+        for _ in 0..11 {
+            test_buffer.next_char();
+        }
+
+        let rollback_result = test_buffer.rollback(5);
+
+        assert!(rollback_result.is_ok());
+
+        for _ in 0..5 {
+            contents.push(test_buffer.next_char());
+        }
+
+        assert!(contents == "ipsum", "found, {contents}");
+    }
+
+    #[test]
+    fn test_buffer_rollback_fail() {
+        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+
+        while !test_buffer.is_eof() {
+            test_buffer.next_char();
+        }
+
+        let rollback_result = test_buffer.rollback(600);
+
+        assert!(rollback_result.is_err());
+
+        let err = rollback_result.unwrap_err();
+
+        println!("{:?}", err);
+
+        match err.downcast_ref() {
+            Some(BufferError::RollbackError) => assert!(true),
+            None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_buffer_rollback_buffer_edge() {
+        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+
+        let mut contents = String::new();
+
+        let mut reread_contents = String::new();
+
+        for _ in 0..512 {
+            // Go to the edge of the buffer
+            test_buffer.next_char();
+        }
+
+        for _ in 0..10 {
+            contents.push(test_buffer.next_char()); // Read the 10 characters after the end of
+                                                    // previous window.
+        }
+
+        let rollback_result = test_buffer.rollback(20); // Rollback by 20
+
+        assert!(rollback_result.is_ok()); // Assert rollback succeeded
+
+        for _ in 0..10 {
+            // Come to the edge of the buffer again
+            test_buffer.next_char();
+        }
+
+        for _ in 0..10 {
+            // Read the 10 characters after the end of the window again.
+            reread_contents.push(test_buffer.next_char());
+        }
+
+        assert!(contents == reread_contents);
+    }
 }
