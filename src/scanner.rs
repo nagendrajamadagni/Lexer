@@ -569,7 +569,7 @@ mod buffer_tests {
     }
 
     #[test]
-    fn test_buffer_rollback_buffer_edge() {
+    fn test_buffer_rollback_buffer_bottom_edge() {
         let mut test_buffer = setup_buffer("buffer.txt".to_string());
 
         let mut contents = String::new();
@@ -584,6 +584,40 @@ mod buffer_tests {
         for _ in 0..10 {
             contents.push(test_buffer.next_char()); // Read the 10 characters after the end of
                                                     // previous window.
+        }
+
+        let rollback_result = test_buffer.rollback(20); // Rollback by 20
+
+        assert!(rollback_result.is_ok()); // Assert rollback succeeded
+
+        for _ in 0..10 {
+            // Come to the edge of the buffer again
+            test_buffer.next_char();
+        }
+
+        for _ in 0..10 {
+            // Read the 10 characters after the end of the window again.
+            reread_contents.push(test_buffer.next_char());
+        }
+
+        assert!(contents == reread_contents);
+    }
+
+    #[test]
+    fn test_buffer_rollback_buffer_top_edge() {
+        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+
+        let mut contents = String::new();
+
+        let mut reread_contents = String::new();
+
+        for _ in 0..1024 {
+            // Go to the edge of the buffer
+            test_buffer.next_char();
+        }
+
+        for _ in 0..10 {
+            contents.push(test_buffer.next_char());
         }
 
         let rollback_result = test_buffer.rollback(20); // Rollback by 20
