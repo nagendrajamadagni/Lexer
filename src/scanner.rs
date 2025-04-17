@@ -547,7 +547,7 @@ mod buffer_tests {
     }
 
     #[test]
-    fn test_buffer_rollback_fail() {
+    fn test_buffer_rollback_fail1() {
         let mut test_buffer = setup_buffer("buffer.txt".to_string());
 
         while !test_buffer.is_eof() {
@@ -560,7 +560,25 @@ mod buffer_tests {
 
         let err = rollback_result.unwrap_err();
 
-        println!("{:?}", err);
+        match err.downcast_ref() {
+            Some(BufferError::RollbackError) => assert!(true),
+            None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_buffer_rollback_fail2() {
+        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+
+        while !test_buffer.is_eof() {
+            test_buffer.next_char();
+        }
+
+        let rollback_result = test_buffer.rollback(2000);
+
+        assert!(rollback_result.is_err());
+
+        let err = rollback_result.unwrap_err();
 
         match err.downcast_ref() {
             Some(BufferError::RollbackError) => assert!(true),
