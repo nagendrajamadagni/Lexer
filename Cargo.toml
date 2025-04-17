@@ -23,8 +23,8 @@ color-eyre = "0.6.3"
 [lib]
 name = "lexer"
 path = "src/lib.rs"
-test = false
-doctest = true
+test = true
+doctest = false
 bench = false
 doc = true
 proc-macro = false
@@ -34,6 +34,6 @@ required-features = []
 [[bin]]
 name = "lexer"
 path = "src/bin/lexer.rs"
-test = false
+test = true
 bench = false
 required-features = []
