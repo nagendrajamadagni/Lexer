@@ -364,7 +364,11 @@ mod regex_tests {
                 Base::Character(c),
                 None,
             ))) if *c == expected_char => {}
-            _ => panic!("Expected simple char '{}', got {:?}", expected_char, regex),
+            _ => assert!(
+                false,
+                "Expected simple char '{}', got {:?}",
+                expected_char, regex
+            ),
         }
     }
 
@@ -374,7 +378,11 @@ mod regex_tests {
                 Base::Exp(inner_regex),
                 None,
             ))) => assert_simple_char(inner_regex, expected_char),
-            _ => panic!("Expected grouped char '{}', got {:?}", expected_char, regex),
+            _ => assert!(
+                false,
+                "Expected grouped char '{}', got {:?}",
+                expected_char, regex
+            ),
         }
     }
 
@@ -387,9 +395,14 @@ mod regex_tests {
                 (Quantifier::Star, Quantifier::Star) => {}
                 (Quantifier::Plus, Quantifier::Plus) => {}
                 (Quantifier::Question, Quantifier::Question) => {}
-                _ => panic!("Expected quantifier {:?}, got {:?}", expected_quantifier, q),
+                _ => assert!(
+                    false,
+                    "Expected quantifier {:?}, got {:?}",
+                    expected_quantifier, q
+                ),
             },
-            _ => panic!(
+            _ => assert!(
+                false,
                 "Expected quantified char '{}', got {:?}",
                 expected_char, regex
             ),
@@ -404,7 +417,11 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::Character(c1), None))
                     if c1 == first_char => {}
-                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+                _ => assert!(
+                    false,
+                    "Expected first char '{}', got {:?}",
+                    first_char, box_term
+                ),
             },
             RegEx::SimpleRegex(Term::ConcatTerm(
                 Factor::SimpleFactor(Base::Character(c2), None),
@@ -412,7 +429,11 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter(c1), None))
                     if c1 == first_char => {}
-                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+                _ => assert!(
+                    false,
+                    "Expected first char '{}', got {:?}",
+                    first_char, box_term
+                ),
             },
             RegEx::SimpleRegex(Term::ConcatTerm(
                 Factor::SimpleFactor(Base::EscapeCharacter(c2), None),
@@ -420,7 +441,11 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::Character(c1), None))
                     if c1 == first_char => {}
-                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+                _ => assert!(
+                    false,
+                    "Expected first char '{}', got {:?}",
+                    first_char, box_term
+                ),
             },
             RegEx::SimpleRegex(Term::ConcatTerm(
                 Factor::SimpleFactor(Base::EscapeCharacter(c2), None),
@@ -428,9 +453,14 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter(c1), None))
                     if c1 == first_char => {}
-                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+                _ => assert!(
+                    false,
+                    "Expected first char '{}', got {:?}",
+                    first_char, box_term
+                ),
             },
-            _ => panic!(
+            _ => assert!(
+                false,
                 "Expected concatenation of '{}' and '{}', got {:?}",
                 first_char, second_char, regex
             ),
@@ -447,12 +477,14 @@ mod regex_tests {
                     Base::Character(c2),
                     None,
                 ))) if c2 == second_char => {}
-                _ => panic!(
+                _ => assert!(
+                    false,
                     "Expected second alternative '{}', got {:?}",
                     second_char, box_regex
                 ),
             },
-            _ => panic!(
+            _ => assert!(
+                false,
                 "Expected alternation of '{}' and '{}', got {:?}",
                 first_char, second_char, regex
             ),
@@ -547,7 +579,7 @@ mod regex_tests {
         assert!(result.is_err());
         match result.unwrap_err().downcast_ref().unwrap() {
             RegExError::UnbalancedParenthesisError(_) => assert!(true),
-            err => panic!("Expected UnbalancedParenthesisError, got {:?}", err),
+            err => assert!(false, "Expected UnbalancedParenthesisError, got {:?}", err),
         }
     }
 
@@ -558,7 +590,7 @@ mod regex_tests {
         assert!(result.is_err(), "Expected Error got {:?}", result);
         match result.unwrap_err().downcast_ref().unwrap() {
             RegExError::InvalidEscapeCharacter(_) => assert!(true),
-            err => panic!("Expected InvalidEscapeCharacter, got {:?}", err),
+            err => assert!(false, "Expected InvalidEscapeCharacter, got {:?}", err),
         }
     }
 
@@ -580,7 +612,68 @@ mod regex_tests {
                 assert!(set.contains(&'b'));
                 assert!(set.contains(&'c'));
             }
-            _ => panic!("Expected character set, got {:?}", base),
+            _ => assert!(false, "Expected character set, got {:?}", base),
+        }
+    }
+
+    // Test for character range
+    #[test]
+    fn test_character_range() {
+        let regex = "[a-c]";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+
+        match base {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                assert_eq!(set.len(), 3);
+                assert!(set.contains(&'a'));
+                assert!(set.contains(&'b'));
+                assert!(set.contains(&'c'));
+            }
+            _ => assert!(false, "Expected character set, got {:?}", base),
+        }
+    }
+
+    // Test for character set with escape character
+    #[test]
+    fn test_character_set_escape_char() {
+        let regex = "[ab\\?]";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+
+        match base {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                assert_eq!(set.len(), 3);
+                assert!(set.contains(&'a'));
+                assert!(set.contains(&'b'));
+                assert!(set.contains(&'?'));
+            }
+            _ => assert!(false, "Expected character set, got {:?}", base),
+        }
+    }
+
+    // Test for invalid character range
+    #[test]
+    fn test_character_range_fail() {
+        let regex = "[a-9]";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidCharacterRange(_, _) => assert!(true),
+            result => assert!(
+                false,
+                "Expected invalid character range error. Got {:?}",
+                result
+            ),
         }
     }
 
