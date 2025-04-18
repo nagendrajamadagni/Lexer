@@ -1,0 +1,10 @@
+<[A-Za-z0-9-]+>::NON_TERMINAL -> add to non terminal
+"[A-Za-z0-9-:;!+<>=*()]+"::TERMINAL -> add to terminal
+\:\:=::DEFINES -> error
+\|::ALTERNATION -> error
+\*::ASTERISK -> error but valid for next_word
+\+::PLUS -> error but valid for next_word
+\?::QUESTION -> error but valid for next_word
+\(::LPAREN -> group start
+\)::RPAREN -> group end
+;::TERMINATION -> error

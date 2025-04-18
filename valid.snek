@@ -1,3 +1,0 @@
-main(input) {
-add1 (sub1 (negate 5));
-}

@@ -1,0 +1,11 @@
+[0-9]+::NUMBER
+add1|sub1|negate::KEYWORD
+;::TERMINATOR
+\(::LPAREN
+\)::RPAREN
+{::LBRACE
+}::RBRACE
+[A-Za-z_][A-Za-z_0-9]*::IDENTIFIER
+[ \r\t\n]+::WHITESPACE
+%[A-Za-z0-9 \t;:()\[\]]+::COMMENT
+"[A-Za-z0-9 \n\r\t#]+"::STRING_CONSTANT
