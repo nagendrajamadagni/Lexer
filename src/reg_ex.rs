@@ -118,6 +118,13 @@ fn nchar_is_valid(nchar: char) -> bool {
     }
 }
 
+fn is_escape_char(escape_ch: char) -> bool {
+    match escape_ch {
+        'n' | 't' | 'r' | '\\' | '(' | ')' | '[' | ']' | '|' | '*' | '+' | '?' => true,
+        _ => false,
+    }
+}
+
 fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize), RegExError> {
     let mut new_start = start;
     let mut char_set: HashSet<char> = HashSet::new();
@@ -135,12 +142,17 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
             new_start = new_start + 3;
         } else {
             if regex.chars().nth(new_start).unwrap() == '\\' {
+                if !is_escape_char(regex.chars().nth(new_start + 1).unwrap()) {
+                    return Err(RegExError::InvalidEscapeCharacter(
+                        regex.chars().nth(new_start + 1).unwrap(),
+                    ));
+                }
                 match regex.chars().nth(new_start + 1).unwrap() {
                     'n' => char_set.insert('\n'),
                     't' => char_set.insert('\t'),
                     'r' => char_set.insert('\r'),
                     '\\' => char_set.insert('\\'),
-                    'C' => char_set.insert('('),
+                    '(' => char_set.insert('('),
                     ')' => char_set.insert(')'),
                     '[' => char_set.insert('['),
                     ']' => char_set.insert(']'),
@@ -191,6 +203,12 @@ fn parse_base(regex: &str, start: usize) -> Result<(Base, usize)> {
         let new_base = Base::CharSet(char_set);
         Ok((new_base, new_start))
     } else if nchar == '\\' {
+        if !is_escape_char(regex.chars().nth(start + 1).unwrap()) {
+            let err = Report::new(RegExError::InvalidEscapeCharacter(
+                regex.chars().nth(start + 1).unwrap(),
+            ));
+            return Err(err);
+        }
         let new_base = Base::EscapeCharacter(regex.chars().nth(start + 1).unwrap());
         let new_start = start + 2;
         Ok((new_base, new_start))
@@ -248,6 +266,16 @@ fn parse_term(regex: &str, start: usize) -> Result<(Term, usize)> {
 }
 
 fn parse_regex(regex: &str, start: usize) -> Result<(RegEx, usize)> {
+    if !balanced_brackets(regex) {
+        let err = Report::new(RegExError::UnbalancedParenthesisError(regex.to_string()));
+        return Err(err);
+    }
+
+    if regex.len() == 0 {
+        let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
+        return Err(err);
+    }
+
     let (term, new_start) = parse_term(regex, start)?;
     if new_start >= regex.len() {
         return Ok((RegEx::SimpleRegex(term), new_start));
@@ -260,16 +288,6 @@ fn parse_regex(regex: &str, start: usize) -> Result<(RegEx, usize)> {
 }
 
 fn build_syntax_tree(regex: &str) -> Result<RegEx> {
-    if !balanced_brackets(regex) {
-        let err = Report::new(RegExError::UnbalancedParenthesisError(regex.to_string()));
-        return Err(err);
-    }
-
-    if regex.len() == 0 {
-        let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
-        return Err(err);
-    }
-
     let (syntax_tree, _) = parse_regex(regex, 0)?;
     return Ok(syntax_tree);
 }
@@ -333,4 +351,274 @@ pub fn read_microsyntax_file(file_path: String) -> Result<Vec<(String, String)>,
     }
 
     Ok(regex_list)
+}
+
+#[cfg(test)]
+mod regex_tests {
+    use crate::reg_ex::{parse_regex, Base, Factor, Quantifier, RegEx, RegExError, Term};
+    use std::collections::HashSet;
+
+    // Helper function to simplify match assertions
+    fn assert_simple_char(regex: &RegEx, expected_char: char) {
+        match regex {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character(c),
+                None,
+            ))) if *c == expected_char => {}
+            _ => panic!("Expected simple char '{}', got {:?}", expected_char, regex),
+        }
+    }
+
+    fn assert_grouped_char(regex: &RegEx, expected_char: char) {
+        match regex {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Exp(inner_regex),
+                None,
+            ))) => assert_simple_char(inner_regex, expected_char),
+            _ => panic!("Expected grouped char '{}', got {:?}", expected_char, regex),
+        }
+    }
+
+    fn assert_quantified_char(regex: &RegEx, expected_char: char, expected_quantifier: Quantifier) {
+        match regex {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character(c),
+                Some(q),
+            ))) if *c == expected_char => match (q, &expected_quantifier) {
+                (Quantifier::Star, Quantifier::Star) => {}
+                (Quantifier::Plus, Quantifier::Plus) => {}
+                (Quantifier::Question, Quantifier::Question) => {}
+                _ => panic!("Expected quantifier {:?}, got {:?}", expected_quantifier, q),
+            },
+            _ => panic!(
+                "Expected quantified char '{}', got {:?}",
+                expected_char, regex
+            ),
+        }
+    }
+
+    fn assert_concatenation(regex: &RegEx, first_char: char, second_char: char) {
+        match regex {
+            RegEx::SimpleRegex(Term::ConcatTerm(
+                Factor::SimpleFactor(Base::Character(c2), None),
+                box_term,
+            )) if *c2 == second_char => match **box_term {
+                Term::SimpleTerm(Factor::SimpleFactor(Base::Character(c1), None))
+                    if c1 == first_char => {}
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+            },
+            RegEx::SimpleRegex(Term::ConcatTerm(
+                Factor::SimpleFactor(Base::Character(c2), None),
+                box_term,
+            )) if *c2 == second_char => match **box_term {
+                Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter(c1), None))
+                    if c1 == first_char => {}
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+            },
+            RegEx::SimpleRegex(Term::ConcatTerm(
+                Factor::SimpleFactor(Base::EscapeCharacter(c2), None),
+                box_term,
+            )) if *c2 == second_char => match **box_term {
+                Term::SimpleTerm(Factor::SimpleFactor(Base::Character(c1), None))
+                    if c1 == first_char => {}
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+            },
+            RegEx::SimpleRegex(Term::ConcatTerm(
+                Factor::SimpleFactor(Base::EscapeCharacter(c2), None),
+                box_term,
+            )) if *c2 == second_char => match **box_term {
+                Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter(c1), None))
+                    if c1 == first_char => {}
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
+            },
+            _ => panic!(
+                "Expected concatenation of '{}' and '{}', got {:?}",
+                first_char, second_char, regex
+            ),
+        }
+    }
+
+    fn assert_alternation(regex: &RegEx, first_char: char, second_char: char) {
+        match regex {
+            RegEx::AlterRegex(
+                Term::SimpleTerm(Factor::SimpleFactor(Base::Character(c1), None)),
+                box_regex,
+            ) if *c1 == first_char => match **box_regex {
+                RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                    Base::Character(c2),
+                    None,
+                ))) if c2 == second_char => {}
+                _ => panic!(
+                    "Expected second alternative '{}', got {:?}",
+                    second_char, box_regex
+                ),
+            },
+            _ => panic!(
+                "Expected alternation of '{}' and '{}', got {:?}",
+                first_char, second_char, regex
+            ),
+        }
+    }
+
+    // Basic tests
+    #[test]
+    fn test_regex_simple_base() {
+        let regex = "a";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_simple_char(&base, 'a');
+    }
+
+    #[test]
+    fn test_regex_group_base() {
+        let regex = "(a)";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_grouped_char(&base, 'a');
+    }
+
+    // Additional tests for more complex patterns
+    #[test]
+    fn test_regex_quantifiers() {
+        // Test star quantifier
+        let regex = "a*";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_quantified_char(&base, 'a', Quantifier::Star);
+
+        // Test plus quantifier
+        let regex = "a+";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_quantified_char(&base, 'a', Quantifier::Plus);
+
+        // Test question mark quantifier
+        let regex = "a?";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_quantified_char(&base, 'a', Quantifier::Question);
+    }
+
+    #[test]
+    fn test_regex_concatenation() {
+        let regex = "ab";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_concatenation(&base, 'a', 'b');
+    }
+
+    #[test]
+    fn test_hyphen_cocatenation() {
+        let regex = "a-";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_concatenation(&base, 'a', '-');
+    }
+
+    #[test]
+    fn test_escape_cocatenation() {
+        let regex = "a\\?";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_concatenation(&base, 'a', '?');
+    }
+
+    #[test]
+    fn test_regex_alternation() {
+        let regex = "a|b";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+        assert_alternation(&base, 'a', 'b');
+    }
+
+    // Error case tests
+    #[test]
+    fn test_unbalanced_parenthesis() {
+        let regex = "(a";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_err());
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::UnbalancedParenthesisError(_) => assert!(true),
+            err => panic!("Expected UnbalancedParenthesisError, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_invalid_escape() {
+        let regex = "\\y"; // Assuming \y is not a valid escape
+        let result = parse_regex(regex, 0);
+        assert!(result.is_err(), "Expected Error got {:?}", result);
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidEscapeCharacter(_) => assert!(true),
+            err => panic!("Expected InvalidEscapeCharacter, got {:?}", err),
+        }
+    }
+
+    // Test for character sets
+    #[test]
+    fn test_character_set() {
+        let regex = "[abc]";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let (base, _) = result.unwrap();
+
+        match base {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                assert_eq!(set.len(), 3);
+                assert!(set.contains(&'a'));
+                assert!(set.contains(&'b'));
+                assert!(set.contains(&'c'));
+            }
+            _ => panic!("Expected character set, got {:?}", base),
+        }
+    }
+
+    // Test for complex nested patterns
+    #[test]
+    fn test_nested_pattern() {
+        let regex = "(a|b)*c";
+        let result = parse_regex(regex, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap().0;
+        println!("Got {:?}", result);
+
+        match result {
+            RegEx::SimpleRegex(Term::ConcatTerm(
+                Factor::SimpleFactor(Base::Character('c'), None),
+                box_term,
+            )) => match *box_term {
+                Term::SimpleTerm(Factor::SimpleFactor(
+                    Base::Exp(inner_regex),
+                    Some(Quantifier::Star),
+                )) => match *inner_regex {
+                    RegEx::AlterRegex(
+                        Term::SimpleTerm(Factor::SimpleFactor(Base::Character('a'), None)),
+                        right,
+                    ) => match *right {
+                        RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                            Base::Character('b'),
+                            None,
+                        ))) => assert!(true),
+                        _ => assert!(false),
+                    },
+                    _ => assert!(false),
+                },
+                _ => assert!(false),
+            },
+
+            _ => assert!(false),
+        }
+    }
 }
