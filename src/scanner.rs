@@ -14,6 +14,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Token {
     token: String,
     category: String,
@@ -105,16 +106,8 @@ impl Buffer {
         } else {
             self.input_ptr + self.source_buffer.len() - amount
         }; // Calculate the final cursor position after rollback
-        println!(
-            "Trying to rollback {} from {} to final position {}",
-            amount, self.input_ptr, final_cursor_position
-        );
 
         if amount > self.input_ptr && final_cursor_position <= self.fence {
-            println!(
-                "The input ptr is {} and the fence is {} so cannot rollback!",
-                self.input_ptr, self.fence
-            );
             let err = Report::new(BufferError::RollbackError);
             return Err(err);
         }
