@@ -635,3 +635,454 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
 
     return result;
 }
+
+#[cfg(test)]
+mod dfa_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_dfa_state_creation() {
+        let state = DFAState::new(1);
+        assert_eq!(state.id, 1);
+        assert_eq!(state.get_transitions().len(), 0);
+        assert_eq!(state.get_category(), "");
+    }
+
+    #[test]
+    fn test_dfa_basic_construction() {
+        let mut dfa = DFA::new();
+        let start = dfa.add_state();
+        let end = dfa.add_state();
+
+        assert_eq!(dfa.get_num_states(), 2);
+        assert_eq!(dfa.get_start_state(), 0);
+        assert_eq!(dfa.get_acceptor_states().len(), 2);
+        assert!(!dfa.get_acceptor_states()[end]);
+        assert!(!dfa.get_acceptor_states()[start]);
+
+        // Mark end as accept state
+        dfa.accept_states.set(end, true);
+        assert!(dfa.get_acceptor_states()[end]);
+
+        // Add transition
+        dfa.states[start].transitions.insert(Symbol::Char('a'), end);
+        let transitions = dfa.get_state_transitions(start);
+        assert_eq!(transitions.len(), 1);
+        assert_eq!(*transitions[0].0, Symbol::Char('a'));
+        assert_eq!(*transitions[0].1, end);
+    }
+
+    #[test]
+    fn test_lookup_table() {
+        let mut lookup_table = LookupTable::new();
+
+        // Test inserting states into sets
+        lookup_table.insert_state_in_set(0, 1);
+        lookup_table.insert_state_in_set(1, 1);
+        lookup_table.insert_state_in_set(2, 2);
+
+        assert_eq!(lookup_table.get_set_of_state(&0), Some(&1));
+        assert_eq!(lookup_table.get_set_of_state(&1), Some(&1));
+        assert_eq!(lookup_table.get_set_of_state(&2), Some(&2));
+        assert_eq!(lookup_table.get_num_sets(), 2);
+
+        // Test moving a state to a different set
+        lookup_table.insert_state_in_set(0, 2);
+        assert_eq!(lookup_table.get_set_of_state(&0), Some(&2));
+
+        // Get sets
+        let sets: Vec<HashSet<usize>> = lookup_table.get_sets().cloned().collect();
+        assert_eq!(sets.len(), 2);
+
+        // Check if sets contain correct elements
+        let set1 = sets.iter().find(|set| set.contains(&1)).unwrap();
+        let set2 = sets
+            .iter()
+            .find(|set| set.contains(&0) && set.contains(&2))
+            .unwrap();
+
+        assert_eq!(set1.len(), 1);
+        assert_eq!(set2.len(), 2);
+    }
+
+    /* Save this for integration testing
+    #[test]
+    fn test_epsilon_closure() {
+        // Create a simple NFA with epsilon transitions
+        let mut nfa = NFA::new();
+        let s0 = nfa.add_state();
+        let s1 = nfa.add_state();
+        let s2 = nfa.add_state();
+
+        // Add epsilon transitions: s0 -> s1 -> s2
+        nfa.states[s0]
+            .transitions
+            .entry(Symbol::Epsilon)
+            .or_default()
+            .insert(s1);
+        nfa.states[s1]
+            .transitions
+            .entry(Symbol::Epsilon)
+            .or_default()
+            .insert(s2);
+
+        // Test epsilon closure of s0
+        let mut start_set = BitVec::repeat(false, nfa.get_num_states());
+        start_set.set(s0, true);
+
+        let epsilon_closure = get_epsilon_closure(&nfa, start_set);
+
+        // Closure should include s0, s1, and s2
+        assert!(epsilon_closure[s0]);
+        assert!(epsilon_closure[s1]);
+        assert!(epsilon_closure[s2]);
+        assert_eq!(epsilon_closure.count_ones(), 3);
+    }
+
+    #[test]
+    fn test_delta_function() {
+        // Create a simple NFA
+        let mut nfa = NFA::new();
+        let s0 = nfa.add_state();
+        let s1 = nfa.add_state();
+        let s2 = nfa.add_state();
+
+        // Add transitions: s0 --a--> s1, s0 --a--> s2
+        nfa.states[s0]
+            .transitions
+            .entry(Symbol::Char('a'))
+            .or_default()
+            .insert(s1);
+        nfa.states[s0]
+            .transitions
+            .entry(Symbol::Char('a'))
+            .or_default()
+            .insert(s2);
+
+        // Set up input state set
+        let mut q = BitVec::repeat(false, nfa.get_num_states());
+        q.set(s0, true);
+
+        // Test delta(q, 'a')
+        let result = delta(&nfa, &q, 'a');
+
+        // Result should include s1 and s2
+        assert!(!result[s0]);
+        assert!(result[s1]);
+        assert!(result[s2]);
+        assert_eq!(result.count_ones(), 2);
+
+        // Test delta(q, 'b') - should return empty set
+        let result = delta(&nfa, &q, 'b');
+        assert_eq!(result.count_ones(), 0);
+    }
+        #[test]
+        fn test_construct_dfa_from_simple_nfa() {
+            // Create a simple NFA for the regex "a|b"
+            let nfa_a = NFA::literal_construction('a');
+            let nfa_b = NFA::literal_construction('b');
+            let nfa = NFA::alternation(nfa_a, nfa_b);
+
+            // Convert to DFA
+            let dfa = construct_dfa(&nfa, false);
+
+            // Check basic properties
+            assert!(dfa.get_alphabet().contains(&'a'));
+            assert!(dfa.get_alphabet().contains(&'b'));
+
+            // DFA should have 3 states: start state + 1 accept state (for both a and b)
+            // + 1 implicit sink state (if implemented)
+            assert!(dfa.get_num_states() >= 2);
+
+            // Check accept states
+            let accept_states: Vec<usize> = dfa.get_acceptor_states().iter_ones().collect();
+            assert_eq!(accept_states.len(), 1);
+
+            // Verify transitions - from start state, both 'a' and 'b' should lead to accept state
+            let start_transitions = dfa.get_state_transitions(dfa.get_start_state());
+
+            // Check if transition for 'a' exists and leads to an accept state
+            let transition_a = start_transitions.iter().find(|(sym, _)| match sym {
+                Symbol::Char(c) => *c == 'a',
+                _ => false,
+            });
+
+            if let Some((_, target_a)) = transition_a {
+                assert!(dfa.get_acceptor_states()[**target_a]);
+            } else {
+                panic!("Transition for 'a' not found");
+            }
+
+            // Check if transition for 'b' exists and leads to an accept state
+            let transition_b = start_transitions.iter().find(|(sym, _)| match sym {
+                Symbol::Char(c) => *c == 'b',
+                _ => false,
+            });
+
+            if let Some((_, target_b)) = transition_b {
+                assert!(dfa.get_acceptor_states()[**target_b]);
+            } else {
+                panic!("Transition for 'b' not found");
+            }
+        }
+    */
+
+    #[test]
+    fn test_construct_minimal_dfa() {
+        // Create a DFA with redundant states
+        let mut dfa = DFA::new();
+
+        // Add states
+        let s0 = dfa.add_state(); // start state
+        let s1 = dfa.add_state(); // accepts 'a'
+        let s2 = dfa.add_state(); // accepts 'b'
+        let s3 = dfa.add_state(); // duplicate of s1, accepts 'a'
+
+        // Set start state
+        dfa.start_state = s0;
+
+        // Add characters to alphabet
+        dfa.alphabet.insert('a');
+        dfa.alphabet.insert('b');
+
+        // Add transitions
+        dfa.states[s0].transitions.insert(Symbol::Char('a'), s1);
+        dfa.states[s0].transitions.insert(Symbol::Char('b'), s2);
+        dfa.states[s1].transitions.insert(Symbol::Char('a'), s1);
+        dfa.states[s1].transitions.insert(Symbol::Char('b'), s2);
+        dfa.states[s2].transitions.insert(Symbol::Char('a'), s3);
+        dfa.states[s2].transitions.insert(Symbol::Char('b'), s2);
+        dfa.states[s3].transitions.insert(Symbol::Char('a'), s3);
+        dfa.states[s3].transitions.insert(Symbol::Char('b'), s2);
+
+        // Set accept states
+        dfa.accept_states.set(s1, true);
+        dfa.accept_states.set(s3, true);
+
+        // Set categories
+        dfa.states[s1].category = "A".to_string();
+        dfa.states[s3].category = "A".to_string();
+
+        // Minimize the DFA
+        let minimal_dfa = construct_minimal_dfa(&dfa, false);
+
+        // The minimal DFA should have 2 states instead of 4
+        // s1 and s3 should be merged
+        assert_eq!(minimal_dfa.get_num_states(), 2);
+
+        // Check accept states
+        let accept_count = minimal_dfa.get_acceptor_states().count_ones();
+        assert_eq!(accept_count, 1);
+
+        // Verify the category is preserved
+        let accept_states: Vec<usize> = minimal_dfa.get_acceptor_states().iter_ones().collect();
+        for state_id in accept_states {
+            assert_eq!(minimal_dfa.get_state(state_id).get_category(), "A");
+        }
+    }
+
+    #[test]
+    fn test_compare_transitions() {
+        // Create two DFA states with same transitions
+        let mut dfa = DFA::new();
+        let s0 = dfa.add_state();
+        let s1 = dfa.add_state();
+        let s2 = dfa.add_state();
+        let s3 = dfa.add_state();
+
+        dfa.alphabet.insert('a');
+        dfa.alphabet.insert('b');
+
+        // States with same transitions pattern
+        dfa.states[s0].transitions.insert(Symbol::Char('a'), s2);
+        dfa.states[s0].transitions.insert(Symbol::Char('b'), s3);
+        dfa.states[s1].transitions.insert(Symbol::Char('a'), s2);
+        dfa.states[s1].transitions.insert(Symbol::Char('b'), s3);
+
+        // Create lookup table
+        let mut lookup_table = LookupTable::new();
+        lookup_table.insert_state_in_set(s0, 0);
+        lookup_table.insert_state_in_set(s1, 0);
+        lookup_table.insert_state_in_set(s2, 1);
+        lookup_table.insert_state_in_set(s3, 2);
+
+        // States should have same transitions
+        let result = compare_transitions(
+            &dfa.states[s0],
+            &dfa.states[s1],
+            &dfa.alphabet,
+            &lookup_table,
+        );
+        assert!(result);
+
+        // Now modify one transition
+        dfa.states[s1].transitions.insert(Symbol::Char('b'), s2);
+
+        // States should have different transitions now
+        let result = compare_transitions(
+            &dfa.states[s0],
+            &dfa.states[s1],
+            &dfa.alphabet,
+            &lookup_table,
+        );
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_reorder_minimal_dfa() {
+        // Create a DFA with unordered states
+        let mut dfa = DFA::new();
+
+        // Add states in non-consecutive order
+        let s0 = dfa.add_state();
+        let s1 = dfa.add_state();
+        let s2 = dfa.add_state();
+
+        // Set up transitions
+        dfa.states[s0].transitions.insert(Symbol::Char('a'), s2);
+        dfa.states[s2].transitions.insert(Symbol::Char('b'), s1);
+
+        // Set start and accept states
+        dfa.start_state = s0;
+        dfa.accept_states.set(s1, true);
+        dfa.states[s1].category = "TEST".to_string();
+
+        // Add to alphabet
+        dfa.alphabet.insert('a');
+        dfa.alphabet.insert('b');
+
+        // Reorder
+        let reordered = reorder_minimal_dfa(&dfa);
+
+        // Should still have 3 states
+        assert_eq!(reordered.get_num_states(), 3);
+
+        // Accept state should still be marked
+        let accept_states: Vec<usize> = reordered.get_acceptor_states().iter_ones().collect();
+        assert_eq!(accept_states.len(), 1);
+
+        // Category should be preserved
+        for accept in accept_states {
+            assert_eq!(reordered.get_state(accept).get_category(), "TEST");
+        }
+
+        // Check if transitions are preserved
+        let start_transitions = reordered.get_state_transitions(reordered.get_start_state());
+        assert_eq!(start_transitions.len(), 1);
+
+        // Follow path: start --a--> middle --b--> accept
+        let middle_state = match start_transitions[0].0 {
+            Symbol::Char('a') => *start_transitions[0].1,
+            _ => panic!("Expected 'a' transition"),
+        };
+
+        let middle_transitions = reordered.get_state_transitions(middle_state);
+        assert_eq!(middle_transitions.len(), 1);
+
+        let end_state = match middle_transitions[0].0 {
+            Symbol::Char('b') => *middle_transitions[0].1,
+            _ => panic!("Expected 'b' transition"),
+        };
+
+        assert!(reordered.get_acceptor_states()[end_state]);
+    }
+    /* Save this for integration testing
+        #[test]
+        fn test_construct_dfa_for_complex_regex() {
+            // Create an NFA for "(a|b)*c"
+            let nfa_a = NFA::literal_construction('a');
+            let nfa_b = NFA::literal_construction('b');
+            let nfa_c = NFA::literal_construction('c');
+
+            let nfa_a_or_b = NFA::alternation(nfa_a, nfa_b);
+            let nfa_a_or_b_star = NFA::closure(nfa_a_or_b, Quantifier::Star);
+            let nfa = NFA::concatenate(nfa_a_or_b_star, nfa_c);
+
+            // Set regex string and category
+            let mut category = "TEST".to_string();
+            nfa.set_accept_category(category.clone()).unwrap();
+
+            // Convert to DFA
+            let dfa = construct_dfa(&nfa, false);
+
+            // Verify that the DFA accepts the correct language
+            assert!(dfa.get_alphabet().contains(&'a'));
+            assert!(dfa.get_alphabet().contains(&'b'));
+            assert!(dfa.get_alphabet().contains(&'c'));
+
+            // Test DFA structure
+            // Start state should have transitions for 'a', 'b', and 'c'
+            let start_transitions = dfa.get_state_transitions(dfa.get_start_state());
+
+            // Find transitions
+            let mut has_a = false;
+            let mut has_b = false;
+            let mut has_c = false;
+            let mut c_leads_to_accept = false;
+
+            for (sym, target) in start_transitions {
+                match sym {
+                    Symbol::Char('a') => has_a = true,
+                    Symbol::Char('b') => has_b = true,
+                    Symbol::Char('c') => {
+                        has_c = true;
+                        c_leads_to_accept = dfa.get_acceptor_states()[**target];
+                    }
+                    _ => {}
+                }
+            }
+
+            assert!(has_a);
+            assert!(has_b);
+            assert!(has_c);
+            assert!(c_leads_to_accept);
+
+            // Check category is preserved
+            let accept_states: Vec<usize> = dfa.get_acceptor_states().iter_ones().collect();
+            for state_id in accept_states {
+                assert_eq!(dfa.get_state(state_id).get_category(), category);
+            }
+
+            // Test minimization
+            let min_dfa = construct_minimal_dfa(&dfa, false);
+
+            // Minimal DFA should maintain the language properties
+            // It should have at least a start state, an intermediate state (for a|b)*, and an accept state
+            assert!(min_dfa.get_num_states() >= 3);
+
+            // Check that category is still preserved after minimization
+            let min_accept_states: Vec<usize> = min_dfa.get_acceptor_states().iter_ones().collect();
+            for state_id in min_accept_states {
+                assert_eq!(min_dfa.get_state(state_id).get_category(), category);
+            }
+        }
+    */
+
+    #[test]
+    fn test_fa_trait_implementation_for_dfa() {
+        // Create a simple DFA
+        let mut dfa = DFA::new();
+        let s0 = dfa.add_state();
+        let s1 = dfa.add_state();
+
+        dfa.start_state = s0;
+        dfa.accept_states.set(s1, true);
+        dfa.alphabet.insert('a');
+
+        dfa.states[s0].transitions.insert(Symbol::Char('a'), s1);
+
+        // Test FA trait methods
+        assert_eq!(dfa.get_num_states(), 2);
+        assert_eq!(dfa.get_start_state(), s0);
+        assert!(dfa.get_alphabet().contains(&'a'));
+
+        let accept_states: Vec<usize> = dfa.get_acceptor_states().iter_ones().collect();
+        assert_eq!(accept_states, vec![s1]);
+
+        let transitions = dfa.get_state_transitions(s0);
+        assert_eq!(transitions.len(), 1);
+        assert_eq!(*transitions[0].0, Symbol::Char('a'));
+        assert_eq!(*transitions[0].1, s1);
+    }
+}
