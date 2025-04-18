@@ -496,11 +496,11 @@ mod buffer_test_helpers {
     use super::Buffer;
     use std::path::PathBuf;
 
-    pub fn setup_buffer(file: String) -> Buffer {
+    pub fn setup_buffer() -> Buffer {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
 
         let mut test_file_path = PathBuf::from(manifest_dir);
-        test_file_path.push(format!("test_data/{file}"));
+        test_file_path.push(format!("test_data/buffer_test_text.txt"));
 
         let test_buffer = Buffer::new(test_file_path).unwrap();
 
@@ -514,7 +514,7 @@ mod buffer_tests {
 
     #[test]
     fn test_buffer_fill() {
-        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+        let mut test_buffer = setup_buffer();
         let mut contents = String::new();
 
         for _ in 0..11 {
@@ -527,7 +527,7 @@ mod buffer_tests {
 
     #[test]
     fn test_buffer_rollback() {
-        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+        let mut test_buffer = setup_buffer();
 
         let mut contents = String::new();
 
@@ -548,7 +548,7 @@ mod buffer_tests {
 
     #[test]
     fn test_buffer_rollback_fail1() {
-        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+        let mut test_buffer = setup_buffer();
 
         while !test_buffer.is_eof() {
             test_buffer.next_char();
@@ -568,7 +568,7 @@ mod buffer_tests {
 
     #[test]
     fn test_buffer_rollback_fail2() {
-        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+        let mut test_buffer = setup_buffer();
 
         while !test_buffer.is_eof() {
             test_buffer.next_char();
@@ -588,7 +588,7 @@ mod buffer_tests {
 
     #[test]
     fn test_buffer_rollback_buffer_bottom_edge() {
-        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+        let mut test_buffer = setup_buffer();
 
         let mut contents = String::new();
 
@@ -623,7 +623,7 @@ mod buffer_tests {
 
     #[test]
     fn test_buffer_rollback_buffer_top_edge() {
-        let mut test_buffer = setup_buffer("buffer.txt".to_string());
+        let mut test_buffer = setup_buffer();
 
         let mut contents = String::new();
 
