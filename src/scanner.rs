@@ -21,7 +21,7 @@ pub struct Token {
 }
 
 impl Token {
-    fn new(token: String, category: String) -> Self {
+    pub fn new(token: String, category: String) -> Self {
         Token { token, category }
     }
     /// Get the token from the Token struct
