@@ -14,6 +14,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Token {
     token: String,
     category: String,
