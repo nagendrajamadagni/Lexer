@@ -355,8 +355,7 @@ pub fn read_microsyntax_file(file_path: String) -> Result<Vec<(String, String)>,
 
 #[cfg(test)]
 mod regex_tests {
-    use crate::reg_ex::{parse_regex, Base, Factor, Quantifier, RegEx, RegExError, Term};
-    use std::collections::HashSet;
+    use crate::regex::{parse_regex, Base, Factor, Quantifier, RegEx, RegExError, Term};
 
     // Helper function to simplify match assertions
     fn assert_simple_char(regex: &RegEx, expected_char: char) {

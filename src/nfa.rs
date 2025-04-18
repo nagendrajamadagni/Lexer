@@ -11,7 +11,7 @@ use std::io::Write;
 use std::process::Command;
 
 use crate::fa::{Symbol, FA};
-use crate::reg_ex::{Base, Factor, Quantifier, RegEx, Term};
+use crate::regex::{Base, Factor, Quantifier, RegEx, Term};
 
 #[derive(Debug)]
 pub enum NFAError {

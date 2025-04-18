@@ -17,14 +17,14 @@ use std::{error, fmt};
 pub mod dfa;
 pub mod fa;
 pub mod nfa;
-pub mod reg_ex;
+pub mod regex;
 pub mod scanner;
 pub mod visualizer;
 
 // Re-export commonly used functions for convenience
 pub use dfa::{construct_dfa, construct_minimal_dfa};
 pub use nfa::construct_nfa;
-pub use reg_ex::{parse_microsyntax_list, read_microsyntax_file};
+pub use regex::{parse_microsyntax_list, read_microsyntax_file};
 pub use scanner::construct_scanner;
 pub use visualizer::visualize;
 
