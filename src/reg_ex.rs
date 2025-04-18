@@ -79,9 +79,9 @@ impl std::fmt::Display for RegExError {
 
 impl std::error::Error for RegExError {}
 
-fn balanced_brackets(reg_ex: &str) -> bool {
+fn balanced_brackets(regex: &str) -> bool {
     let mut stack = Vec::new();
-    let mut chars = reg_ex.chars().peekable();
+    let mut chars = regex.chars().peekable();
 
     while let Some(ch) = chars.next() {
         if ch == '\\' {
