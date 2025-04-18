@@ -567,3 +567,322 @@ pub fn construct_nfa(
 
     Ok(result)
 }
+
+#[cfg(test)]
+mod nfa_tests {
+    use super::*;
+
+    #[test]
+    fn test_nfa_state_creation() {
+        let state = NFAState::new(1);
+        assert_eq!(state.get_id(), 1);
+        assert_eq!(state.get_transitions().len(), 0);
+        assert_eq!(state.get_category(), "");
+    }
+
+    #[test]
+    fn test_nfa_basic_construction() {
+        let mut nfa = NFA::new();
+        let start = nfa.add_state();
+        let end = nfa.add_state();
+
+        assert_eq!(nfa.get_num_states(), 2);
+        assert_eq!(nfa.get_start_state(), 0);
+        assert_eq!(nfa.get_acceptor_states().len(), 2);
+        assert!(!nfa.get_acceptor_states()[end]);
+        assert!(!nfa.get_acceptor_states()[start]);
+
+        // Mark end as accept state
+        nfa.accept_states.set(end, true);
+        assert!(nfa.get_acceptor_states()[end]);
+    }
+
+    #[test]
+    fn test_literal_construction() {
+        let nfa = NFA::literal_construction('a');
+
+        assert_eq!(nfa.get_num_states(), 2);
+        assert_eq!(nfa.get_start_state(), 0);
+        assert_eq!(nfa.get_alphabet().len(), 1);
+        assert!(nfa.get_alphabet().contains(&'a'));
+
+        // Check transitions
+        let transitions = nfa.get_state_transitions(0);
+        assert_eq!(transitions.len(), 1);
+        assert_eq!(*transitions[0].0, Symbol::Char('a'));
+        assert_eq!(*transitions[0].1, 1);
+
+        // Check accept state
+        assert!(nfa.get_acceptor_states()[1]);
+        assert!(!nfa.get_acceptor_states()[0]);
+    }
+
+    #[test]
+    fn test_escape_literal_construction() {
+        let nfa = NFA::escape_literal_construction('n').unwrap();
+
+        assert_eq!(nfa.get_num_states(), 2);
+        assert!(nfa.get_alphabet().contains(&'\n'));
+
+        // Test invalid escape character
+        let result = NFA::escape_literal_construction('x');
+        assert!(result.is_err());
+        match result {
+            Err(NFAError::InvalidEscapeCharError(c)) => assert_eq!(c, 'x'),
+            _ => panic!("Expected InvalidEscapeCharError"),
+        }
+    }
+
+    #[test]
+    fn test_concatenation() {
+        let nfa1 = NFA::literal_construction('a');
+        let nfa2 = NFA::literal_construction('b');
+
+        let concat_nfa = NFA::concatenate(nfa1, nfa2);
+
+        assert_eq!(concat_nfa.get_num_states(), 4);
+        assert_eq!(concat_nfa.get_start_state(), 0);
+        assert_eq!(concat_nfa.get_alphabet().len(), 2);
+        assert!(concat_nfa.get_alphabet().contains(&'a'));
+        assert!(concat_nfa.get_alphabet().contains(&'b'));
+
+        // Check that the original accept state of nfa1 has an epsilon transition to nfa2's start
+        let transitions = concat_nfa.get_state_transitions(1);
+        let has_epsilon_to_nfa2_start = transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 2);
+        assert!(has_epsilon_to_nfa2_start);
+
+        // Check that only nfa2's accept state is now an accept state
+        assert!(!concat_nfa.get_acceptor_states()[0]);
+        assert!(!concat_nfa.get_acceptor_states()[1]);
+        assert!(!concat_nfa.get_acceptor_states()[2]);
+        assert!(concat_nfa.get_acceptor_states()[3]);
+    }
+
+    #[test]
+    fn test_alternation() {
+        let nfa1 = NFA::literal_construction('a');
+        let nfa2 = NFA::literal_construction('b');
+
+        let alt_nfa = NFA::alternation(nfa1, nfa2);
+
+        // Should have: new start + 2 from nfa1 + 2 from nfa2 + new accept = 6 states
+        assert_eq!(alt_nfa.get_num_states(), 6);
+
+        // Check that new start state has epsilon transitions to both nfa start states
+        let start_transitions = alt_nfa.get_state_transitions(0);
+        assert_eq!(start_transitions.len(), 2);
+
+        // Check that both original accept states have epsilon transitions to new accept
+        let nfa1_accept_transitions = alt_nfa.get_state_transitions(2);
+        let nfa2_accept_transitions = alt_nfa.get_state_transitions(4);
+
+        let nfa1_to_new_accept = nfa1_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 5);
+        let nfa2_to_new_accept = nfa2_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 5);
+
+        assert!(nfa1_to_new_accept);
+        assert!(nfa2_to_new_accept);
+
+        // Check that only the new accept state is marked as an accept state
+        let accept_states: Vec<usize> = alt_nfa.get_acceptor_states().iter_ones().collect();
+        assert_eq!(accept_states, vec![5]);
+    }
+
+    #[test]
+    fn test_closure_star() {
+        let nfa = NFA::literal_construction('a');
+        let star_nfa = NFA::closure(nfa, Quantifier::Star);
+
+        // Should have new start + 2 from original + new accept = 4 states
+        assert_eq!(star_nfa.get_num_states(), 4);
+
+        // Start state should have epsilon to original start and to new accept (for empty match)
+        let start_transitions = star_nfa.get_state_transitions(0);
+        let to_original_start = start_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 1);
+        let to_new_accept = start_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 3);
+
+        assert!(to_original_start);
+        assert!(to_new_accept);
+
+        // Original accept should have epsilon to original start (for repetition) and new accept
+        let original_accept_transitions = star_nfa.get_state_transitions(2);
+        let back_to_start = original_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 1);
+        let to_new_accept_from_original = original_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 3);
+
+        assert!(back_to_start);
+        assert!(to_new_accept_from_original);
+    }
+
+    #[test]
+    fn test_closure_plus() {
+        let nfa = NFA::literal_construction('a');
+        let plus_nfa = NFA::closure(nfa, Quantifier::Plus);
+
+        // Should have new start + 2 from original + new accept = 4 states
+        assert_eq!(plus_nfa.get_num_states(), 4);
+
+        // Start state should have epsilon to original start but NOT to new accept (at least one match required)
+        let start_transitions = plus_nfa.get_state_transitions(0);
+        let to_original_start = start_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 1);
+        let to_new_accept = start_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 3);
+
+        assert!(to_original_start);
+        assert!(!to_new_accept);
+
+        // Original accept should have epsilon to original start (for repetition) and new accept
+        let original_accept_transitions = plus_nfa.get_state_transitions(2);
+        let back_to_start = original_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 1);
+        let to_new_accept_from_original = original_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 3);
+
+        assert!(back_to_start);
+        assert!(to_new_accept_from_original);
+    }
+
+    #[test]
+    fn test_closure_question() {
+        let nfa = NFA::literal_construction('a');
+        let question_nfa = NFA::closure(nfa, Quantifier::Question);
+
+        // Should have new start + 2 from original + new accept = 4 states
+        assert_eq!(question_nfa.get_num_states(), 4);
+
+        // Start state should have epsilon to original start and to new accept (for optional match)
+        let start_transitions = question_nfa.get_state_transitions(0);
+        let to_original_start = start_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 1);
+        let to_new_accept = start_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 3);
+
+        assert!(to_original_start);
+        assert!(to_new_accept);
+
+        // Original accept should have epsilon to new accept but NOT back to original start
+        let original_accept_transitions = question_nfa.get_state_transitions(2);
+        let back_to_start = original_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 1);
+        let to_new_accept_from_original = original_accept_transitions
+            .iter()
+            .any(|(sym, target)| **sym == Symbol::Epsilon && **target == 3);
+
+        assert!(!back_to_start);
+        assert!(to_new_accept_from_original);
+    }
+
+    #[test]
+    fn test_get_state() {
+        let mut nfa = NFA::new();
+        let s0 = nfa.add_state();
+        let s1 = nfa.add_state();
+
+        let state0 = nfa.get_state(s0).unwrap();
+        let state1 = nfa.get_state(s1).unwrap();
+
+        assert_eq!(state0.get_id(), 0);
+        assert_eq!(state1.get_id(), 1);
+
+        let result = nfa.get_state(99);
+        assert!(result.is_err());
+        match result {
+            Err(NFAError::InvalidIndexError) => {}
+            _ => panic!("Expected InvalidIndexError"),
+        }
+    }
+
+    #[test]
+    fn test_set_accept_category() {
+        let mut nfa = NFA::new();
+        let s0 = nfa.add_state();
+        let s1 = nfa.add_state();
+
+        nfa.accept_states.set(s1, true);
+
+        let result = nfa.set_accept_category("IDENTIFIER".to_string());
+        assert!(result.is_ok());
+
+        let state1 = nfa.get_state(s1).unwrap();
+        assert_eq!(state1.get_category(), "IDENTIFIER");
+
+        // Non-accept states shouldn't be affected
+        let state0 = nfa.get_state(s0).unwrap();
+        assert_eq!(state0.get_category(), "");
+    }
+
+    #[test]
+    fn test_fa_trait_implementation() {
+        let nfa = NFA::literal_construction('a');
+
+        assert_eq!(nfa.get_num_states(), 2);
+        assert_eq!(nfa.get_start_state(), 0);
+        assert!(nfa.get_alphabet().contains(&'a'));
+
+        let accept_states: Vec<usize> = nfa.get_acceptor_states().iter_ones().collect();
+        assert_eq!(accept_states, vec![1]);
+
+        let transitions = nfa.get_state_transitions(0);
+        assert_eq!(transitions.len(), 1);
+        assert_eq!(*transitions[0].0, Symbol::Char('a'));
+        assert_eq!(*transitions[0].1, 1);
+    }
+
+    #[test]
+    fn test_complex_regex_construction() {
+        // Test parsing and constructing an NFA for a simple regex like "a(b|c)*d"
+        // This would require integration with your regex parser, so let's simulate it
+
+        // First create NFAs for the components
+        let nfa_a = NFA::literal_construction('a');
+        let nfa_b = NFA::literal_construction('b');
+        let nfa_c = NFA::literal_construction('c');
+        let nfa_d = NFA::literal_construction('d');
+
+        // Create b|c
+        let nfa_b_or_c = NFA::alternation(nfa_b, nfa_c);
+
+        // Create (b|c)*
+        let nfa_b_or_c_star = NFA::closure(nfa_b_or_c, Quantifier::Star);
+
+        // Create a(b|c)*
+        let nfa_a_bc_star = NFA::concatenate(nfa_a, nfa_b_or_c_star);
+
+        // Create a(b|c)*d
+        let nfa_final = NFA::concatenate(nfa_a_bc_star, nfa_d);
+
+        // Verify the structure
+        assert!(nfa_final.get_alphabet().contains(&'a'));
+        assert!(nfa_final.get_alphabet().contains(&'b'));
+        assert!(nfa_final.get_alphabet().contains(&'c'));
+        assert!(nfa_final.get_alphabet().contains(&'d'));
+
+        // The exact number would depend on how your alternation and closure work
+        // but we can at least check it's of a reasonable size
+        assert!(nfa_final.get_num_states() > 8); // Rough minimum estimate
+
+        // Only one accept state at the end
+        let accept_count = nfa_final.get_acceptor_states().count_ones();
+        assert_eq!(accept_count, 1);
+    }
+}
