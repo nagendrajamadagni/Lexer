@@ -1,9 +1,0 @@
-[0-9]+::NUMBER
-add1|sub1|negate::KEYWORD
-;::TERMINATOR
-\(::LPAREN
-\)::RPAREN
-{::LBRACE
-}::RBRACE
-[A-Za-z_][A-Za-z_0-9]*::IDENTIFIER
-[ \r\t\n]+::WHITESPACE
