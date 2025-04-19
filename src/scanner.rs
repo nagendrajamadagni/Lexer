@@ -37,12 +37,14 @@ impl Token {
 #[derive(Debug)]
 enum BufferError {
     RollbackError,
+    FillError,
 }
 
 impl std::fmt::Display for BufferError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::RollbackError => write!(f, "Error: Buffer rollback failed!"),
+            Self::FillError => write!(f, "Error: Buffer filling failed!"),
         }
     }
 }
@@ -58,7 +60,7 @@ struct Buffer {
 }
 
 impl Buffer {
-    fn new(file_path: PathBuf) -> Result<Self, std::io::Error> {
+    fn new(file_path: PathBuf) -> Result<Self> {
         let file = File::open(file_path)?;
 
         let buf_reader = BufReader::new(file);
@@ -70,17 +72,22 @@ impl Buffer {
             fill_end: 0,
         };
 
-        buffer.fill_buffer(0, buffer.source_buffer.len() / 2);
+        buffer.fill_buffer(0, buffer.source_buffer.len() / 2)?;
         return Ok(buffer);
     }
 
-    fn fill_buffer(&mut self, start: usize, end: usize) {
+    fn fill_buffer(&mut self, start: usize, end: usize) -> Result<()> {
         assert!(end > start);
         assert!(end - start == self.source_buffer.len() / 2);
-        let bytes_read = self
-            .buf_reader
-            .read(&mut self.source_buffer[start..end])
-            .unwrap();
+        let bytes_read = self.buf_reader.read(&mut self.source_buffer[start..end]);
+
+        let bytes_read = match bytes_read {
+            Ok(bytes_read) => bytes_read,
+            Err(_) => {
+                let err = Report::new(BufferError::FillError);
+                return Err(err);
+            }
+        };
 
         if bytes_read < end - start {
             // We reached the EOF and cannot read anymore, mark the EOF
@@ -90,6 +97,8 @@ impl Buffer {
         }
 
         self.fill_end = end % self.source_buffer.len();
+
+        Ok(())
         //TODO create an error called fill error and propagate it
     }
 
@@ -124,7 +133,8 @@ impl Buffer {
         self.input_ptr = (self.input_ptr + 1) % two_n;
 
         if self.input_ptr == self.fill_end {
-            self.fill_buffer(self.input_ptr, self.input_ptr + n);
+            self.fill_buffer(self.input_ptr, self.input_ptr + n)
+                .unwrap();
             self.fence = (self.input_ptr + n) % two_n;
         }
 
@@ -558,7 +568,7 @@ mod buffer_tests {
 
         match err.downcast_ref() {
             Some(BufferError::RollbackError) => assert!(true),
-            None => assert!(false),
+            _ => assert!(false),
         }
     }
 
@@ -578,7 +588,7 @@ mod buffer_tests {
 
         match err.downcast_ref() {
             Some(BufferError::RollbackError) => assert!(true),
-            None => assert!(false),
+            _ => assert!(false),
         }
     }
 
