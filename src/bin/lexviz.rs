@@ -1,13 +1,13 @@
 use clap::{Arg, Command};
 use color_eyre::eyre::{Report, Result};
-use lexer::{
+use lexviz::{
     construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
     read_microsyntax_file, visualize, LexerError,
 };
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    let args = Command::new("lexer")
+    let args = Command::new("lexviz")
                         .version("1.0")
                         .author("Nagendra Kumar Jamadagni")
                         .about("A sample lexer built from following Engineering a Compiler by Keith Cooper and Linda Torczan")

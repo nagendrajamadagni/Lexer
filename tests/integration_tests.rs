@@ -1,11 +1,11 @@
 mod integration_tests_helper {
 
-    use lexer::{
+    use lexviz::{
         construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner,
         parse_microsyntax_list, read_microsyntax_file,
     };
 
-    use lexer::scanner::{Scanner, Token};
+    use lexviz::scanner::{Scanner, Token};
 
     pub fn get_token(token: &str, category: &str) -> Token {
         Token::new(token.to_string(), category.to_string())
@@ -45,7 +45,7 @@ mod integration_tests_helper {
 mod integration_tests {
     use crate::integration_tests_helper::{get_scanner, get_token};
 
-    use lexer::scanner::{ScannerError, Token};
+    use lexviz::scanner::{ScannerError, Token};
 
     #[test]
     fn test_valid_invalid_lex() {

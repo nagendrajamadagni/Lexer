@@ -1,4 +1,4 @@
-//! # lexer
+//! # lexviz
 //!
 //! A lexer library built following the text "Engineering a Compiler 2e"
 //! by Keith Cooper and Linda Torczan.

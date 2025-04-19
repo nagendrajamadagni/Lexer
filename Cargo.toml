@@ -1,5 +1,5 @@
 [package]
-name = "lexer"
+name = "lexviz"
 version = "1.0.0"
 edition = "2021"
 description = """A customizable lexical analyser tool which also allows you to visualize the NFAs and DFAs generated."""
@@ -21,7 +21,7 @@ eframe = "0.31.1"
 color-eyre = "0.6.3"
 
 [lib]
-name = "lexer"
+name = "lexviz"
 path = "src/lib.rs"
 test = true
 doctest = false
@@ -32,8 +32,8 @@ crate-type = ["lib"]
 required-features = []
 
 [[bin]]
-name = "lexer"
-path = "src/bin/lexer.rs"
+name = "lexviz"
+path = "src/bin/lexviz.rs"
 test = true
 bench = false
 required-features = []
