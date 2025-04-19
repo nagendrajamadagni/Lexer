@@ -10,3 +10,4 @@ Dockerfile
 *.sh
 .DS_STORE
 *.gz
+Makefile
