@@ -138,9 +138,12 @@ impl Buffer {
     }
 }
 
+/// List of possible errors in the scanner
 #[derive(Debug)]
-enum ScannerError {
+pub enum ScannerError {
+    /// Found an epsilon transition in a DFA
     EpsilonInDFA,
+    /// Found a bad token which cannot be categorized in the list of syntactic categories provided
     BadToken(String),
 }
 
