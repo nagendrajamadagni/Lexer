@@ -8,6 +8,8 @@ This program is built by following the material "Engineering a Compiler (2e) by 
 
 # How To Use This Program
 
+## Directly using the binary
+
 To use this program simply clone the repo and run with the following command:
 <br>
 `cargo run --release (-f <input mst file>  OR  -r r1 c1 -r r2 c2...) -i <input source program file> [-o <output file path>] [-n] [-d] [-m]`
@@ -47,6 +49,14 @@ The different options as follows:
 <br>
 
 - --visualize [-v] : Visualize the finite automata created by the tool, takes one of NFA, DFA or MINIMAL as an option and opens an interactive window which shows the finite automata selected.
+
+## Using it as a library
+
+You can also install this as a library to develop your own custom software. Simply `cargo install lexviz` inside your Rust project to install the library and use it within your own project
+
+# Library Documentation
+
+Run `cargo doc --open` to get the full documentation of the library and its functions for developing your own projects.
 
 # Example microsyntax file
 
