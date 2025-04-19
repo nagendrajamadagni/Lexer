@@ -14,6 +14,7 @@ pub enum Quantifier {
     Question,
     Plus,
     Exact(u32),
+    Range(u32, u32),
 }
 
 #[derive(Debug)]
@@ -227,31 +228,82 @@ fn parse_base(regex: &str, start: usize) -> Result<(Base, usize)> {
     }
 }
 
-fn get_exact_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usize)> {
+fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usize)> {
     let mut pos = start;
-    let mut number = 0;
+    let mut lower_number = 0;
+    let mut higher_number = 0;
 
-    while regex.chars().nth(pos).unwrap() != '}' {
+    while regex.chars().nth(pos).unwrap() != '}' && regex.chars().nth(pos).unwrap() != '-' {
         // As long as this is a number
-        let ch = match regex.chars().nth(pos) {
-            Some(ch) => ch,
+        match regex.chars().nth(pos) {
+            Some(_) => {}
             None => {
                 let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
                 return Err(err);
             }
         };
-        let digit = match ch.to_digit(10) {
+        let digit = match regex.chars().nth(pos).unwrap().to_digit(10) {
             Some(digit) => digit,
             None => {
-                let err = Report::new(RegExError::InvalidQuantifier(ch));
+                let err = Report::new(RegExError::InvalidQuantifier(
+                    regex.chars().nth(pos).unwrap(),
+                ));
                 return Err(err);
             }
         };
-        number = (number * 10) + digit;
+
+        lower_number = (lower_number * 10) + digit;
         pos = pos + 1;
     }
 
-    Ok((Quantifier::Exact(number), pos + 1)) // Consume the rbrace
+    if regex.chars().nth(pos).unwrap() == '}' {
+        return Ok((Quantifier::Exact(lower_number), pos + 1)); // Consume the rbrace
+    }
+
+    while regex.chars().nth(pos).unwrap() == ' ' {
+        // Skip any spaces after the number
+        pos = pos + 1;
+    }
+
+    if regex.chars().nth(pos).unwrap() == '-' {
+        pos = pos + 1;
+    } else {
+        let err = Report::new(RegExError::InvalidQuantifier(
+            regex.chars().nth(pos).unwrap(),
+        ));
+        return Err(err);
+    }
+
+    while regex.chars().nth(pos).unwrap() != '}' {
+        // As long as this is a number
+
+        match regex.chars().nth(pos) {
+            Some(_) => {}
+            None => {
+                let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
+                return Err(err);
+            }
+        };
+
+        let digit = match regex.chars().nth(pos).unwrap().to_digit(10) {
+            Some(digit) => digit,
+            None => {
+                let err = Report::new(RegExError::InvalidQuantifier(
+                    regex.chars().nth(pos).unwrap(),
+                ));
+                return Err(err);
+            }
+        };
+        higher_number = (higher_number * 10) + digit;
+        pos = pos + 1;
+    }
+
+    if lower_number >= higher_number {
+        let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
+        return Err(err);
+    }
+
+    Ok((Quantifier::Range(lower_number, higher_number), pos + 1))
 }
 
 fn parse_factor(regex: &str, start: usize) -> Result<(Factor, usize)> {
@@ -271,7 +323,7 @@ fn parse_factor(regex: &str, start: usize) -> Result<(Factor, usize)> {
             new_start += 1;
             Some(Quantifier::Plus)
         } else if regex.chars().nth(new_start).unwrap() == '{' {
-            let (quantifier, nstart) = get_exact_quantifier(regex, new_start + 1)?;
+            let (quantifier, nstart) = get_numeric_quantifier(regex, new_start + 1)?;
             new_start = nstart;
             Some(quantifier)
         } else {
@@ -393,7 +445,7 @@ pub fn read_microsyntax_file(file_path: String) -> Result<Vec<(String, String)>,
 mod regex_tests {
     use crate::regex::{parse_regex, Base, Factor, Quantifier, RegEx, RegExError, Term};
 
-    use super::get_exact_quantifier;
+    use super::get_numeric_quantifier;
 
     // Helper function to simplify match assertions
     fn assert_simple_char(regex: &RegEx, expected_char: char) {
@@ -722,7 +774,6 @@ mod regex_tests {
         let result = parse_regex(regex, 0);
         assert!(result.is_ok());
         let result = result.unwrap().0;
-        println!("Got {:?}", result);
 
         match result {
             RegEx::SimpleRegex(Term::ConcatTerm(
@@ -756,9 +807,9 @@ mod regex_tests {
     fn test_exact_quantifier() {
         let regex = "a{5}";
 
-        let result = get_exact_quantifier(regex, 2);
+        let result = get_numeric_quantifier(regex, 2);
 
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Got {:?}", result);
 
         let result = result.unwrap().0;
 
@@ -786,7 +837,7 @@ mod regex_tests {
     fn test_exact_quantifier_multi_digit() {
         let regex = "a{456}";
 
-        let result = get_exact_quantifier(regex, 2);
+        let result = get_numeric_quantifier(regex, 2);
 
         assert!(result.is_ok());
 
@@ -816,7 +867,7 @@ mod regex_tests {
     fn test_exact_quantifier_invalid() {
         let regex = "a{4f6}";
 
-        let result = get_exact_quantifier(regex, 2);
+        let result = get_numeric_quantifier(regex, 2);
 
         assert!(result.is_err());
 
@@ -831,6 +882,112 @@ mod regex_tests {
 
         match result.unwrap_err().downcast_ref().unwrap() {
             RegExError::InvalidQuantifier(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_range_quantifier() {
+        let regex = "a{5-7}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_ok(), "Got {:?}", result);
+
+        let result = result.unwrap().0;
+
+        match result {
+            Quantifier::Range(5, 7) => assert!(true),
+            _ => assert!(false, "Got {:?}", result),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character('a'),
+                Some(Quantifier::Range(5, 7)),
+            ))) => assert!(true),
+            _ => assert!(false, "Got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_range_quantifier_multi_digit() {
+        let regex = "a{45-64}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            Quantifier::Range(45, 64) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character('a'),
+                Some(Quantifier::Range(45, 64)),
+            ))) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_range_quantifier_invalid1() {
+        let regex = "a{4-f}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidQuantifier(_) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidQuantifier(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_range_quantifier_invalid2() {
+        let regex = "a{4-1}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidRegexError(_) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidRegexError(_) => assert!(true),
             _ => assert!(false),
         }
     }

@@ -312,6 +312,7 @@ impl NFA {
             }
             Quantifier::Plus => {}
             Quantifier::Exact(_) => todo!(),
+            Quantifier::Range(_, _) => todo!(),
         }
 
         let accept_states: Vec<usize> = nfa.accept_states.iter_ones().collect();
