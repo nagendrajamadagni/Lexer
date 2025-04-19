@@ -56,6 +56,28 @@ add1|sub1|negate::KEYWORD
 <br>
 [a-z]+::LOWERCASE
 
+# Supported Regex Operations
+- () : Grouping
+- [abc] : Character Sets
+- [a-c] : Simple Character Range
+- \* : Kleene Closure for zero or more occurences
+- \+ : Kleene Closure for one or more occurences
+- ? : Operator for zero or one occurence
+
+# Supported Escape Characters
+- \n : Newline
+- \t : Tab
+- \r : Carriage Return
+- \\\\ : Backslash
+- \\\( : Left parenthesis
+- \\\) : Right paranthesis
+- \\\[ : Left Bracket
+- \\\] : Right Bracket
+- \\\| : Pipe
+- \\\* : Asterisk
+- \\\+ : Plus
+- \\\? : Question
+
 # Sample Output
 
 ## Sample Output for a Valid Program
