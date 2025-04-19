@@ -15,6 +15,8 @@ pub enum Quantifier {
     Plus,
     Exact(u32),
     Range(u32, u32),
+    Atleast(u32),
+    Atmost(u32),
 }
 
 #[derive(Debug)]
@@ -233,6 +235,18 @@ fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usiz
     let mut lower_number = 0;
     let mut higher_number = 0;
 
+    let mut atmost = false;
+
+    while regex.chars().nth(pos).unwrap() == ' ' {
+        // Skip any spaces after the LBrace
+        pos = pos + 1;
+    }
+
+    if regex.chars().nth(pos).unwrap() == '-' {
+        atmost = true;
+        pos = pos + 1;
+    }
+
     while regex.chars().nth(pos).unwrap() != '}' && regex.chars().nth(pos).unwrap() != '-' {
         // As long as this is a number
         match regex.chars().nth(pos) {
@@ -257,7 +271,11 @@ fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usiz
     }
 
     if regex.chars().nth(pos).unwrap() == '}' {
-        return Ok((Quantifier::Exact(lower_number), pos + 1)); // Consume the rbrace
+        if atmost {
+            return Ok((Quantifier::Atmost(lower_number), pos + 1));
+        } else {
+            return Ok((Quantifier::Exact(lower_number), pos + 1)); // Consume the rbrace
+        }
     }
 
     while regex.chars().nth(pos).unwrap() == ' ' {
@@ -272,6 +290,12 @@ fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usiz
             regex.chars().nth(pos).unwrap(),
         ));
         return Err(err);
+    }
+
+    // We have either a range or an atleast quantifier
+
+    if regex.chars().nth(pos).unwrap() == '}' {
+        return Ok((Quantifier::Atleast(lower_number), pos + 1));
     }
 
     while regex.chars().nth(pos).unwrap() != '}' {
@@ -892,7 +916,7 @@ mod regex_tests {
 
         let result = get_numeric_quantifier(regex, 2);
 
-        assert!(result.is_ok(), "Got {:?}", result);
+        assert!(result.is_ok());
 
         let result = result.unwrap().0;
 
@@ -988,6 +1012,172 @@ mod regex_tests {
 
         match result.unwrap_err().downcast_ref().unwrap() {
             RegExError::InvalidRegexError(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_atleast_quantifier() {
+        let regex = "a{5-}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            Quantifier::Atleast(5) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character('a'),
+                Some(Quantifier::Atleast(5)),
+            ))) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_atleast_quantifier_multi_digit() {
+        let regex = "a{45-}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            Quantifier::Atleast(45) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character('a'),
+                Some(Quantifier::Atleast(45)),
+            ))) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_atleast_quantifier_invalid1() {
+        let regex = "a{4f-}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidQuantifier(_) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidQuantifier(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_atmost_quantifier() {
+        let regex = "a{-5}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            Quantifier::Atmost(5) => assert!(true),
+            _ => assert!(false, "Got {:?}", result),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character('a'),
+                Some(Quantifier::Atmost(5)),
+            ))) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_atmost_quantifier_multi_digit() {
+        let regex = "a{-45}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            Quantifier::Atmost(45) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::Character('a'),
+                Some(Quantifier::Atmost(45)),
+            ))) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_atmost_quantifier_invalid1() {
+        let regex = "a{-4f}";
+
+        let result = get_numeric_quantifier(regex, 2);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidQuantifier(_) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidQuantifier(_) => assert!(true),
             _ => assert!(false),
         }
     }
