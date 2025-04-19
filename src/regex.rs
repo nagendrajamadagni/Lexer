@@ -113,6 +113,14 @@ fn balanced_brackets(regex: &str) -> bool {
                     return false;
                 }
             }
+            '{' => {
+                stack.push(ch);
+            }
+            '}' => {
+                if stack.is_empty() || stack.pop() != Some('{') {
+                    return false;
+                }
+            }
             _ => {}
         }
     }
@@ -128,7 +136,7 @@ fn nchar_is_valid(nchar: char) -> bool {
 
 fn is_escape_char(escape_ch: char) -> bool {
     match escape_ch {
-        'n' | 't' | 'r' | '\\' | '(' | ')' | '[' | ']' | '|' | '*' | '+' | '?' => true,
+        'n' | 't' | 'r' | '\\' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '*' | '+' | '?' => true,
         _ => false,
     }
 }
@@ -164,6 +172,8 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
                     ')' => char_set.insert(')'),
                     '[' => char_set.insert('['),
                     ']' => char_set.insert(']'),
+                    '{' => char_set.insert('{'),
+                    '}' => char_set.insert('}'),
                     '|' => char_set.insert('|'),
                     '*' => char_set.insert('*'),
                     '+' => char_set.insert('+'),
@@ -1033,7 +1043,7 @@ mod regex_tests {
 
         let result = parse_regex(regex, 0);
 
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Got {:?}", result);
 
         let result = result.unwrap().0;
 
@@ -1179,6 +1189,39 @@ mod regex_tests {
         match result.unwrap_err().downcast_ref().unwrap() {
             RegExError::InvalidQuantifier(_) => assert!(true),
             _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_lbrace_rbrace() {
+        let regex = "{";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::UnbalancedParenthesisError(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_lbrace_rbrace_escaped() {
+        let regex = "\\{";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::EscapeCharacter('{'),
+                None,
+            ))) => assert!(true),
+            _ => assert!(false, "Expected {{, got {:?}", result),
         }
     }
 }
