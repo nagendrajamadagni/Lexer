@@ -26,7 +26,7 @@ fn main() {
 
     let scanner = construct_scanner(&minimal_dfa);
 
-    let output_file = "abc_output".to_string();
+    let output_file = "abc_output.lex".to_string();
 
     let token_list = scanner
         .scan(src_file_path, Some(output_file), false, None)
