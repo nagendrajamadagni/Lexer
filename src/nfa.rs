@@ -39,7 +39,7 @@ pub struct NFAState {
     category: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NFA {
     states: Vec<NFAState>,
     start_state: usize,
@@ -511,6 +511,27 @@ fn parse_factor_tree(tree: Factor) -> Result<NFA> {
                 None => Ok(nfa),
                 Some(Quantifier::Star) | Some(Quantifier::Plus) | Some(Quantifier::Question) => {
                     Ok(NFA::closure(nfa, quantifier.unwrap()))
+                }
+                Some(Quantifier::Exact(num)) => {
+                    let mut result = nfa.clone();
+                    for _ in 1..num {
+                        result = NFA::concatenate(result, nfa.clone());
+                    }
+                    Ok(result)
+                }
+                Some(Quantifier::Atleast(num)) => {
+                    let mut result = nfa.clone();
+                    for _ in 1..num {
+                        // Concatenate atleast num times
+                        result = NFA::concatenate(result, nfa.clone());
+                    }
+
+                    // Create a closure of 0 or more times
+                    let nfa_star = NFA::closure(nfa.clone(), Quantifier::Star);
+
+                    // After atleast num times concatenate the 0 or more times to the result
+                    result = NFA::concatenate(result, nfa_star);
+                    Ok(result)
                 }
                 _ => todo!(),
             }
