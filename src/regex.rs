@@ -146,6 +146,17 @@ fn is_escape_char(escape_ch: char) -> bool {
 fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize), RegExError> {
     let mut new_start = start;
     let mut char_set: HashSet<char> = HashSet::new();
+    let mut negation: bool = false;
+
+    if new_start > regex.len() {
+        let err = RegExError::InvalidRegexError(regex.to_string());
+        return Err(err);
+    }
+
+    if regex.chars().nth(new_start).unwrap() == '^' {
+        negation = true;
+        new_start = new_start + 1;
+    }
 
     while new_start < regex.len() && regex.chars().nth(new_start).unwrap() != ']' {
         if regex.chars().nth(new_start + 1).unwrap() == '-' {
@@ -195,7 +206,23 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
         }
     }
 
-    return Ok((char_set, new_start));
+    if negation {
+        let mut ascii_set: HashSet<char> = HashSet::new();
+
+        let start_char: u8 = 32;
+        let end_char: u8 = 126;
+
+        for ch in start_char..=end_char {
+            ascii_set.insert(ch as char);
+        }
+        ascii_set.insert('\t');
+
+        let difference_set = ascii_set.difference(&char_set).cloned().collect();
+        return Ok((difference_set, new_start));
+        // Calculate the difference and return
+    } else {
+        return Ok((char_set, new_start));
+    }
 }
 
 fn parse_base(regex: &str, start: usize) -> Result<(Base, usize)> {
@@ -1365,6 +1392,55 @@ mod regex_tests {
                 None,
             ))) => {
                 assert!(set.contains(&'.'));
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_negation() {
+        let regex = "[^a-z]";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                for ch in 'a'..='z' {
+                    assert!(!set.contains(&ch));
+                }
+                assert!(set.contains(&'A'));
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_not_negation() {
+        let regex = "[a-z^]";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                for ch in 'a'..='z' {
+                    assert!(set.contains(&ch));
+                }
+                assert!(set.contains(&'^'));
+                assert!(!set.contains(&'A'));
             }
             _ => assert!(false),
         }
