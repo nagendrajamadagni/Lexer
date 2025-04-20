@@ -145,4 +145,66 @@ mod integration_tests {
 
         assert_eq!(token_list, expected_list);
     }
+
+    #[test]
+    fn test_atleast_atmost() {
+        let scanner = get_scanner("test_data/atleast_atmost.mst");
+
+        let src_file_path = "test_data/atleast_atmost.snek".to_string();
+
+        let skip_list = vec!["NEWLINE".to_string()];
+
+        let token_list = scanner.scan(src_file_path, None, false, Some(skip_list));
+
+        assert!(token_list.is_ok());
+
+        let token_list = token_list.unwrap();
+
+        let mut expected_list: Vec<Token> = Vec::new();
+        expected_list.push(get_token("aaaaa", "ATLEAST_FIVE_A"));
+        expected_list.push(get_token("aaaa", "ATMOST_FIVE_A"));
+        expected_list.push(get_token("aaaaaa", "ATLEAST_FIVE_A"));
+
+        assert_eq!(token_list, expected_list);
+    }
+
+    #[test]
+    fn test_range() {
+        let scanner = get_scanner("test_data/range.mst");
+
+        let src_file_path = "test_data/range.snek".to_string();
+
+        let skip_list = vec!["NEWLINE".to_string()];
+
+        let token_list = scanner.scan(src_file_path, None, false, Some(skip_list));
+
+        assert!(token_list.is_ok());
+
+        let token_list = token_list.unwrap();
+
+        let mut expected_list: Vec<Token> = Vec::new();
+        expected_list.push(get_token("aaaaa", "THREE_FIVE_A"));
+        expected_list.push(get_token("aaa", "THREE_FIVE_A"));
+        expected_list.push(get_token("aaaa", "THREE_FIVE_A"));
+
+        assert_eq!(token_list, expected_list);
+    }
+
+    #[test]
+    fn test_range_invalid() {
+        let scanner = get_scanner("test_data/range_invalid.mst");
+
+        let src_file_path = "test_data/range_invalid.snek".to_string();
+
+        let skip_list = vec!["NEWLINE".to_string()];
+
+        let token_list = scanner.scan(src_file_path, None, false, Some(skip_list));
+
+        assert!(token_list.is_err());
+
+        match token_list.unwrap_err().downcast_ref().unwrap() {
+            ScannerError::BadToken(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
 }

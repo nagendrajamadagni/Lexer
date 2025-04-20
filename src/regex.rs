@@ -843,7 +843,7 @@ mod regex_tests {
 
         let result = get_numeric_quantifier(regex, 2);
 
-        assert!(result.is_ok(), "Got {:?}", result);
+        assert!(result.is_ok());
 
         let result = result.unwrap().0;
 
@@ -932,7 +932,7 @@ mod regex_tests {
 
         match result {
             Quantifier::Range(5, 7) => assert!(true),
-            _ => assert!(false, "Got {:?}", result),
+            _ => assert!(false),
         }
 
         let result = parse_regex(regex, 0);
@@ -946,7 +946,7 @@ mod regex_tests {
                 Base::Character('a'),
                 Some(Quantifier::Range(5, 7)),
             ))) => assert!(true),
-            _ => assert!(false, "Got {:?}", result),
+            _ => assert!(false),
         }
     }
 
@@ -1043,7 +1043,7 @@ mod regex_tests {
 
         let result = parse_regex(regex, 0);
 
-        assert!(result.is_ok(), "Got {:?}", result);
+        assert!(result.is_ok());
 
         let result = result.unwrap().0;
 
@@ -1121,7 +1121,7 @@ mod regex_tests {
 
         match result {
             Quantifier::Atmost(5) => assert!(true),
-            _ => assert!(false, "Got {:?}", result),
+            _ => assert!(false),
         }
 
         let result = parse_regex(regex, 0);
