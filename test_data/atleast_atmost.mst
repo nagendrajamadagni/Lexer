@@ -1,0 +1,3 @@
+a{5-}::ATLEAST_FIVE_A
+a{-5}::ATMOST_FIVE_A
+\n::NEWLINE
