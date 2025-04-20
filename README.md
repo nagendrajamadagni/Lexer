@@ -73,6 +73,10 @@ add1|sub1|negate::KEYWORD
 - \* : Kleene Closure for zero or more occurences
 - \+ : Kleene Closure for one or more occurences
 - ? : Operator for zero or one occurence
+- {n} : Repeat n times
+- {n-} : Repeat atleast n times
+- {-n} : Repeat atmost n times
+- {n-m} : Repeat atleast n times and atmost m times
 
 # Supported Escape Characters
 - \n : Newline
@@ -83,10 +87,17 @@ add1|sub1|negate::KEYWORD
 - \\\) : Right paranthesis
 - \\\[ : Left Bracket
 - \\\] : Right Bracket
+- \\\{ : Left Brace
+- \\\} : Right Brace
 - \\\| : Pipe
 - \\\* : Asterisk
 - \\\+ : Plus
 - \\\? : Question
+- \\:\\: : Escaping the separator operator inside the micro-syntax files
+
+# Examples
+
+The examples folder has many examples illustrating the different features provided by the binary and the usage of different functions available for development
 
 # Sample Output
 
