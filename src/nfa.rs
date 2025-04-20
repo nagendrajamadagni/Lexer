@@ -310,11 +310,7 @@ impl NFA {
                     .or_default()
                     .insert(new_accept);
             }
-            Quantifier::Plus => {}
-            Quantifier::Exact(_) => todo!(),
-            Quantifier::Range(_, _) => todo!(),
-            Quantifier::Atleast(_) => todo!(),
-            Quantifier::Atmost(_) => todo!(),
+            _ => {}
         }
 
         let accept_states: Vec<usize> = nfa.accept_states.iter_ones().collect();
@@ -513,7 +509,10 @@ fn parse_factor_tree(tree: Factor) -> Result<NFA> {
             let nfa = parse_base_tree(base)?;
             match quantifier {
                 None => Ok(nfa),
-                Some(quantifier) => Ok(NFA::closure(nfa, quantifier)),
+                Some(Quantifier::Star) | Some(Quantifier::Plus) | Some(Quantifier::Question) => {
+                    Ok(NFA::closure(nfa, quantifier.unwrap()))
+                }
+                _ => todo!(),
             }
         }
     }
