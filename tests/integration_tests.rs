@@ -207,4 +207,25 @@ mod integration_tests {
             _ => assert!(false),
         }
     }
+
+    #[test]
+    fn test_dot_operator() {
+        let scanner = get_scanner("test_data/everything.mst");
+
+        let src_file_path = "test_data/everything.snek".to_string();
+
+        let token_list = scanner.scan(src_file_path, None, true, None);
+
+        assert!(token_list.is_ok());
+
+        let token_list = token_list.unwrap();
+
+        let mut expected_list: Vec<Token> = Vec::new();
+
+        expected_list.push(get_token("a", "EVERYTHING"));
+        expected_list.push(get_token("b", "EVERYTHING"));
+        expected_list.push(get_token("c", "EVERYTHING"));
+
+        assert_eq!(token_list, expected_list);
+    }
 }
