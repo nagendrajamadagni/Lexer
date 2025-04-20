@@ -127,9 +127,10 @@ fn balanced_brackets(regex: &str) -> bool {
     stack.is_empty()
 }
 
+// If these characters are found in a base term then it is invalid
 fn nchar_is_valid(nchar: char) -> bool {
     match nchar {
-        '*' | '|' | '?' | ')' | ']' => false,
+        '*' | '|' | '?' | ')' | ']' | '{' | '}' => false,
         _ => true,
     }
 }
@@ -1193,7 +1194,7 @@ mod regex_tests {
     }
 
     #[test]
-    fn test_lbrace_rbrace() {
+    fn test_lbrace() {
         let regex = "{";
 
         let result = parse_regex(regex, 0);
@@ -1207,7 +1208,7 @@ mod regex_tests {
     }
 
     #[test]
-    fn test_lbrace_rbrace_escaped() {
+    fn test_lbrace_escaped() {
         let regex = "\\{";
 
         let result = parse_regex(regex, 0);
@@ -1222,6 +1223,44 @@ mod regex_tests {
                 None,
             ))) => assert!(true),
             _ => assert!(false, "Expected {{, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_lbrace_rbrace() {
+        let regex = "{}";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_err());
+
+        match result.unwrap_err().downcast_ref().unwrap() {
+            RegExError::InvalidRegexError(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_lbrace_rbrace_escaped() {
+        let regex = "\\{\\}";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::ConcatTerm(
+                Factor::SimpleFactor(Base::EscapeCharacter('}'), None),
+                lterm,
+            )) => match *lterm {
+                Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter('{'), None)) => {
+                    assert!(true)
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
         }
     }
 }
