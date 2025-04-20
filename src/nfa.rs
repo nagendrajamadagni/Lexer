@@ -432,6 +432,7 @@ impl NFA {
             '*' => '*',
             '+' => '+',
             '?' => '?',
+            '.' => '.',
             _ => return Err(NFAError::InvalidEscapeCharError(character)),
         };
 

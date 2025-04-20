@@ -137,7 +137,8 @@ fn nchar_is_valid(nchar: char) -> bool {
 
 fn is_escape_char(escape_ch: char) -> bool {
     match escape_ch {
-        'n' | 't' | 'r' | '\\' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '*' | '+' | '?' => true,
+        'n' | 't' | 'r' | '\\' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '*' | '+' | '?'
+        | '.' => true,
         _ => false,
     }
 }
@@ -179,6 +180,7 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
                     '*' => char_set.insert('*'),
                     '+' => char_set.insert('+'),
                     '?' => char_set.insert('?'),
+                    '.' => char_set.insert('.'),
                     _ => {
                         return Err(RegExError::InvalidEscapeCharacter(
                             regex.chars().nth(new_start + 1).unwrap(),
@@ -220,6 +222,22 @@ fn parse_base(regex: &str, start: usize) -> Result<(Base, usize)> {
         };
         let new_start = new_start + 1; // Consume the rparen
         let new_base = Base::CharSet(char_set);
+        Ok((new_base, new_start))
+    } else if nchar == '.' {
+        let new_start = start + 1;
+        let mut char_set = HashSet::new();
+
+        let start_char: u8 = 32;
+        let end_char: u8 = 126;
+
+        for ch in start_char..=end_char {
+            char_set.insert(ch as char);
+        }
+
+        char_set.insert('\t'); // Insert tab separately
+
+        let new_base = Base::CharSet(char_set);
+
         Ok((new_base, new_start))
     } else if nchar == '\\' {
         if !is_escape_char(regex.chars().nth(start + 1).unwrap()) {
