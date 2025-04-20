@@ -546,7 +546,31 @@ fn parse_factor_tree(tree: Factor) -> Result<NFA> {
 
                     Ok(result)
                 }
-                _ => todo!(),
+                Some(Quantifier::Range(start, end)) => {
+                    let mut least = nfa.clone();
+
+                    for _ in 1..start {
+                        // Concatenate atleast start number of times
+                        least = NFA::concatenate(least, nfa.clone());
+                    }
+
+                    // Repeat the 0 or 1 closure end - start times
+
+                    let question = NFA::closure(nfa, Quantifier::Question);
+
+                    let mut most = question.clone();
+
+                    for _ in 1..(end - start) {
+                        most = NFA::concatenate(most, question.clone());
+                    }
+
+                    // Concatenate the least and the optional number of times to get least and most
+                    // range
+
+                    let result = NFA::concatenate(least, most);
+
+                    Ok(result)
+                }
             }
         }
     }
