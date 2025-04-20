@@ -70,6 +70,7 @@ add1|sub1|negate::KEYWORD
 - () : Grouping
 - [abc] : Character Sets
 - [a-c] : Simple Character Range
+- [^a-c] : Negates the character range [a-c] from the set of ascii printable characters and tab
 - \* : Kleene Closure for zero or more occurences
 - \+ : Kleene Closure for one or more occurences
 - ? : Operator for zero or one occurence
