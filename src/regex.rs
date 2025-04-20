@@ -1281,4 +1281,92 @@ mod regex_tests {
             _ => assert!(false),
         }
     }
+
+    #[test]
+    fn test_dot_escaped() {
+        let regex = "\\.";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::EscapeCharacter('.'),
+                None,
+            ))) => assert!(true),
+            _ => assert!(false, "Expected {{, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_dot() {
+        let regex = ".";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                let start_char: u8 = 32;
+                let end_char: u8 = 126;
+
+                for ch in start_char..=end_char {
+                    assert!(set.contains(&(ch as char)));
+                }
+                assert!(set.contains(&'\t'));
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_dot_set() {
+        let regex = "[.]";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                assert!(set.contains(&'.'));
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_dot_set_escaped() {
+        let regex = "[\\.]";
+
+        let result = parse_regex(regex, 0);
+
+        assert!(result.is_ok());
+
+        let result = result.unwrap().0;
+
+        match result {
+            RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
+                Base::CharSet(set),
+                None,
+            ))) => {
+                assert!(set.contains(&'.'));
+            }
+            _ => assert!(false),
+        }
+    }
 }
