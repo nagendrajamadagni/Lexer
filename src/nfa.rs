@@ -1,7 +1,8 @@
 use bitvec::prelude::*;
 use color_eyre::eyre::{Report, Result};
 use petgraph::dot::Dot;
-use petgraph::graph::DiGraph;
+use petgraph::graph::{EdgeIndex, NodeIndex};
+use petgraph::prelude::StableGraph;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error;
 use std::fmt;
@@ -117,41 +118,77 @@ impl NFA {
     }
 
     fn show_fa(&self, filename: &str) {
-        let mut graph = DiGraph::new();
-        let mut node_map = std::collections::HashMap::new();
+        let mut stable_graph = StableGraph::new();
 
-        // Add nodes
-        for state in &self.states {
-            let node = graph.add_node(format!("State {}", state.id));
-            node_map.insert(state.id, node);
+        let num_states = self.states.len();
+
+        let mut edge_map: HashMap<(NodeIndex, NodeIndex), EdgeIndex> = HashMap::new();
+
+        // Add all nodes
+
+        for _state_idx in 0..num_states {
+            stable_graph.add_node(String::new());
         }
 
-        // Add edges
-        for state in &self.states {
-            for (symbol, targets) in &state.transitions {
-                for target in targets {
-                    let symbol_str = match symbol {
-                        Symbol::Char(c) => c.to_string(),
-                        Symbol::Epsilon => "𝛆".to_string(),
-                    };
-                    graph.add_edge(node_map[&state.id], node_map[&target], symbol_str);
+        // Add all edges and store in map for adding labels later
+
+        for state_idx in 0..num_states {
+            let transition_list = &self.states[state_idx].transitions;
+
+            for transition in transition_list {
+                let edge_set = transition.1;
+
+                for edge_target in edge_set {
+                    if !stable_graph
+                        .contains_edge(NodeIndex::new(state_idx), NodeIndex::new(*edge_target))
+                    {
+                        let edge_idx = stable_graph.add_edge(
+                            NodeIndex::new(state_idx),
+                            NodeIndex::new(*edge_target),
+                            String::new(),
+                        );
+                        edge_map.insert(
+                            (NodeIndex::new(state_idx), NodeIndex::new(*edge_target)),
+                            edge_idx,
+                        );
+                    }
                 }
             }
         }
 
-        // Mark Start and Accept States
+        for state_idx in 0..num_states {
+            let node_label = format!("State {}", state_idx);
 
-        let start_node = node_map[&self.start_state];
-        graph[start_node] = format!("Start\nState {}", self.start_state);
+            stable_graph[NodeIndex::new(state_idx)] = node_label;
 
-        let accept_states: Vec<usize> = self.accept_states.iter_ones().collect();
+            let transition_list = &self.states[state_idx].transitions;
 
-        for accept in accept_states {
-            let accept_node = node_map[&accept];
-            graph[accept_node] = format!("State {}\nAccept", accept);
+            for transition in transition_list {
+                let edge_label = match transition.0 {
+                    Symbol::Char(ch) => format!("{}", ch),
+                    Symbol::Epsilon => format!("𝛆"),
+                };
+
+                let edge_set = transition.1;
+
+                for edge_target in edge_set {
+                    let edge_idx = edge_map
+                        .get(&(NodeIndex::new(state_idx), NodeIndex::new(*edge_target)))
+                        .unwrap();
+
+                    let old_label = &stable_graph[*edge_idx];
+                    let new_label = if old_label.is_empty() {
+                        edge_label.clone()
+                    } else {
+                        format!("{}, {}", old_label, edge_label)
+                    };
+
+                    stable_graph[*edge_idx] = new_label;
+                }
+            }
         }
 
-        let dot = Dot::new(&graph);
+        let dot = Dot::new(&stable_graph);
 
         // Write dot to file
         let dot_filename = format!("{}.dot", filename);
