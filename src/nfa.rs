@@ -533,6 +533,19 @@ fn parse_factor_tree(tree: Factor) -> Result<NFA> {
                     result = NFA::concatenate(result, nfa_star);
                     Ok(result)
                 }
+                Some(Quantifier::Atmost(num)) => {
+                    // Create a 0 or 1 closure of the NFA
+                    let question = NFA::closure(nfa, Quantifier::Question);
+
+                    // Repeat the 0 or 1 closure num times
+                    let mut result = question.clone();
+
+                    for _ in 1..num {
+                        result = NFA::concatenate(result, question.clone());
+                    }
+
+                    Ok(result)
+                }
                 _ => todo!(),
             }
         }
