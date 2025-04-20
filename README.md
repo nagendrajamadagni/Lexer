@@ -77,6 +77,7 @@ add1|sub1|negate::KEYWORD
 - {n-} : Repeat atleast n times
 - {-n} : Repeat atmost n times
 - {n-m} : Repeat atleast n times and atmost m times
+- . : Matches with all printable ascii characters and tab
 
 # Supported Escape Characters
 - \n : Newline
@@ -93,6 +94,7 @@ add1|sub1|negate::KEYWORD
 - \\\* : Asterisk
 - \\\+ : Plus
 - \\\? : Question
+- \\\. : Dot
 - \\:\\: : Escaping the separator operator inside the micro-syntax files
 
 # Examples
