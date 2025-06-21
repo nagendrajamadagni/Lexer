@@ -65,11 +65,11 @@ impl FA for NFA {
     }
 
     fn get_alphabet(&self) -> &HashSet<char> {
-        return &self.alphabet;
+        &self.alphabet
     }
 
     fn get_acceptor_states(&self) -> &BitVec<u8> {
-        return &self.accept_states;
+        &self.accept_states
     }
     fn get_state_transitions(&self, state_id: usize) -> Vec<(&Symbol, &usize)> {
         let mut transition_list: Vec<(&Symbol, &usize)> = Vec::new();
@@ -81,7 +81,7 @@ impl FA for NFA {
             }
         }
 
-        return transition_list;
+        transition_list
     }
 }
 
@@ -99,7 +99,7 @@ impl NFAState {
     }
     /// Get the id of the state
     pub fn get_id(&self) -> usize {
-        return self.id;
+        self.id
     }
     /// Get the syntactic category that this state accepts, if it is an accept state. Otherwise, it
     /// returns an empty string.
@@ -114,7 +114,7 @@ impl NFA {
         let new_state: NFAState = NFAState::new(state_id);
         self.states.push(new_state);
         self.accept_states.push(false);
-        return state_id;
+        state_id
     }
 
     fn show_fa(&self, filename: &str) {
@@ -166,7 +166,7 @@ impl NFA {
             for transition in transition_list {
                 let edge_label = match transition.0 {
                     Symbol::Char(ch) => format!("{}", ch),
-                    Symbol::Epsilon => format!("𝛆"),
+                    Symbol::Epsilon => "𝛆".to_string(),
                 };
 
                 let edge_set = transition.1;
@@ -199,7 +199,7 @@ impl NFA {
             .expect("Failed to write dot file");
 
         Command::new("dot")
-            .args(&["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)])
+            .args(["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)])
             .output()
             .expect("Failed to execute Graphviz");
 
@@ -303,7 +303,7 @@ impl NFA {
         result.accept_states.set(new_accept, true);
         result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
 
-        return result;
+        result
     }
 
     fn closure(nfa: NFA, quantifier: Quantifier) -> NFA {
@@ -376,7 +376,7 @@ impl NFA {
         result.start_state = new_start;
         result.accept_states.set(new_accept, true);
         result.alphabet = nfa.alphabet;
-        return result;
+        result
     }
 
     fn concatenate(nfa1: NFA, nfa2: NFA) -> NFA {
@@ -429,7 +429,7 @@ impl NFA {
         }
 
         result.alphabet = nfa1.alphabet.union(&nfa2.alphabet).cloned().collect();
-        return result;
+        result
     }
 
     fn literal_construction(character: char) -> NFA {
@@ -446,7 +446,7 @@ impl NFA {
 
         result.start_state = start_state;
         result.accept_states.set(end_state, true);
-        return result;
+        result
     }
 
     fn escape_literal_construction(character: char) -> Result<NFA, NFAError> {
@@ -483,14 +483,14 @@ impl NFA {
         result.start_state = start_state;
         result.accept_states.set(end_state, true);
 
-        return Ok(result);
+        Ok(result)
     }
     /// Get the state for the provided id
     pub fn get_state(&self, id: usize) -> Result<&NFAState, NFAError> {
         let state = self.states.get(id);
         match state {
             Some(state) => Ok(state),
-            None => return Err(NFAError::InvalidIndexError),
+            None => Err(NFAError::InvalidIndexError),
         }
     }
 
@@ -511,7 +511,7 @@ impl NFA {
     }
     /// Get the regular expression that the NFA models
     pub fn get_regex(&self) -> &String {
-        return &self.regex;
+        &self.regex
     }
 }
 
@@ -522,7 +522,7 @@ fn parse_base_tree(tree: Base) -> Result<NFA> {
             Ok(character) => Ok(character),
             Err(err) => {
                 let err = Report::new(err);
-                return Err(err);
+                Err(err)
             }
         },
         Base::Exp(regex) => {
@@ -662,7 +662,7 @@ pub fn construct_nfa(
         result.regex = new_regex;
     }
     if save_nfa {
-        let filename = format!("constructed_nfa");
+        let filename = "constructed_nfa".to_string();
         result.show_fa(&filename);
     }
 

@@ -73,7 +73,7 @@ impl Buffer {
         };
 
         buffer.fill_buffer(0, buffer.source_buffer.len() / 2)?;
-        return Ok(buffer);
+        Ok(buffer)
     }
 
     fn fill_buffer(&mut self, start: usize, end: usize) -> Result<()> {
@@ -138,7 +138,7 @@ impl Buffer {
             self.fence = (self.input_ptr + n) % two_n;
         }
 
-        ch.try_into().unwrap()
+        ch.into()
     }
 
     fn is_eof(&self) -> bool {
@@ -191,7 +191,7 @@ impl Scanner {
         }
     }
 
-    fn compress_init_table(&mut self, init_table: &Vec<Vec<usize>>, alphabet: &Vec<char>) {
+    fn compress_init_table(&mut self, init_table: &[Vec<usize>], alphabet: &[char]) {
         // Generate a 64 bit hash for each column based on contents
         // Map each hash with a class id
         // If 2 columns get the same hash, they will have the same class id.
@@ -206,8 +206,8 @@ impl Scanner {
         for col_id in 0..num_cols {
             let mut hasher = DefaultHasher::new();
 
-            for row_id in 0..num_rows {
-                init_table[row_id][col_id].hash(&mut hasher);
+            for row in init_table.iter().take(num_rows) {
+                row[col_id].hash(&mut hasher);
             }
 
             let hash = hasher.finish(); // Generate the 64 bit hash for the column
@@ -233,9 +233,9 @@ impl Scanner {
 
         // Compress the transition table columns by getting the class id for each character
 
-        for row_id in 0..num_rows {
-            for col_id in 0..num_cols {
-                let destination = init_table[row_id][col_id];
+        for (row_id, row) in init_table.iter().take(num_rows).enumerate() {
+            for (col_id, col) in row.iter().take(num_cols).enumerate() {
+                let destination = *col;
                 let char_input = alphabet.get(col_id).copied();
                 let class_id = self.classifier_table.get(&char_input).unwrap();
                 self.transition_table[row_id][*class_id] = destination;
@@ -263,9 +263,14 @@ impl Scanner {
             init_transition_table.push(column_vec);
         }
 
-        for state in 0..num_states {
+        //for state in 0..num_states {
+        for (state_id, state) in init_transition_table
+            .iter_mut()
+            .enumerate()
+            .take(num_states)
+        {
             // For all states
-            let dfa_state = dfa.get_state(state);
+            let dfa_state = dfa.get_state(state_id);
             let transitions = dfa_state.get_transitions();
 
             for transition in transitions {
@@ -280,9 +285,9 @@ impl Scanner {
 
                 let char_index = alphabet.binary_search(symbol).unwrap(); // Get the index in the sorted alphabet set for the character
 
-                init_transition_table[state][char_index] = *target; // For that state index and char
-                                                                    // index mark the transition
-                                                                    // state id.
+                state[char_index] = *target; // For that state index and char
+                                             // index mark the transition
+                                             // state id.
             }
         }
 
@@ -306,7 +311,7 @@ impl Scanner {
             for target in column_vec {
                 print!("{target}   ");
             }
-            println!("");
+            println!();
         }
     }
 
@@ -365,7 +370,7 @@ impl Scanner {
                 continue;
             }
 
-            cur_pos = cur_pos + 1;
+            cur_pos += 1;
             lexeme.push(ch);
 
             let category = self.classifier_table.get(&Some(ch));
@@ -472,7 +477,7 @@ impl Scanner {
             for token in token_list.iter() {
                 let output_line = format!("({}, {})", token.token, token.category);
 
-                let _ = writeln!(out_file, "{}", output_line).unwrap();
+                writeln!(out_file, "{}", output_line).unwrap();
             }
         }
         Ok(token_list)
@@ -492,11 +497,10 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
 
     scanner.init_token_type_table(dfa);
 
-    return scanner;
+    scanner
 }
 
 #[cfg(test)]
-
 mod buffer_test_helpers {
 
     use super::Buffer;
@@ -506,11 +510,9 @@ mod buffer_test_helpers {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
 
         let mut test_file_path = PathBuf::from(manifest_dir);
-        test_file_path.push(format!("test_data/buffer_test_text.txt"));
+        test_file_path.push("test_data/buffer_test_text.txt");
 
-        let test_buffer = Buffer::new(test_file_path).unwrap();
-
-        test_buffer
+        Buffer::new(test_file_path).unwrap()
     }
 }
 
@@ -567,8 +569,8 @@ mod buffer_tests {
         let err = rollback_result.unwrap_err();
 
         match err.downcast_ref() {
-            Some(BufferError::RollbackError) => assert!(true),
-            _ => assert!(false),
+            Some(BufferError::RollbackError) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -587,8 +589,8 @@ mod buffer_tests {
         let err = rollback_result.unwrap_err();
 
         match err.downcast_ref() {
-            Some(BufferError::RollbackError) => assert!(true),
-            _ => assert!(false),
+            Some(BufferError::RollbackError) => {}
+            _ => unreachable!(),
         }
     }
 

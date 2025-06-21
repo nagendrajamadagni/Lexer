@@ -107,7 +107,7 @@ fn generate_stable_graph<T: FA>(fa: &T) -> Graph {
         for transition in transition_list {
             let edge_label = match *transition.0 {
                 Symbol::Char(ch) => format!("{}", ch),
-                Symbol::Epsilon => format!("eps"),
+                Symbol::Epsilon => "eps".to_string(),
             };
 
             let edge_target = transition.1;
@@ -127,7 +127,7 @@ fn generate_stable_graph<T: FA>(fa: &T) -> Graph {
         }
     }
 
-    return graph;
+    graph
 }
 /// Visualizes the finite automata provided
 pub fn visualize<T: FA>(fa: &T) {

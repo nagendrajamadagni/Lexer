@@ -47,10 +47,7 @@ impl LookupTable {
         match prev_set {
             None => {
                 // If state was not in a previous set, insert it into the provided set
-                self.set_to_states_map
-                    .entry(set)
-                    .or_insert_with(HashSet::new)
-                    .insert(state);
+                self.set_to_states_map.entry(set).or_default().insert(state);
             }
             Some(prev_set_key) => {
                 // If state was present in a previous set, remove it from previous set and insert
@@ -63,10 +60,7 @@ impl LookupTable {
                     }
                 }
 
-                self.set_to_states_map
-                    .entry(set)
-                    .or_insert_with(HashSet::new)
-                    .insert(state);
+                self.set_to_states_map.entry(set).or_default().insert(state);
             }
         }
     }
@@ -106,7 +100,7 @@ impl FA for DFA {
         for transition in self.states[state_id].transitions.iter() {
             transition_list.push(transition);
         }
-        return transition_list;
+        transition_list
     }
 }
 
@@ -138,7 +132,7 @@ impl DFA {
         let new_state: DFAState = DFAState::new();
         self.states.push(new_state);
         self.accept_states.push(false);
-        return state_id;
+        state_id
     }
 
     fn show_fa(&self, filename: &str) {
@@ -188,7 +182,7 @@ impl DFA {
             for transition in transition_list {
                 let edge_label = match transition.0 {
                     Symbol::Char(ch) => format!("{}", ch),
-                    Symbol::Epsilon => format!("𝛆"),
+                    Symbol::Epsilon => "𝛆".to_string(),
                 };
 
                 let edge_target = transition.1;
@@ -218,7 +212,7 @@ impl DFA {
             .expect("Failed to write dot file");
 
         Command::new("dot")
-            .args(&["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)])
+            .args(["-Tjpg", &dot_filename, "-o", &format!("{}.jpg", filename)])
             .output()
             .expect("Failed to execute Graphviz");
 
@@ -238,21 +232,21 @@ impl DFA {
     /// Returns a reference to the DFA state whose id is provided
     pub fn get_state(&self, id: usize) -> &DFAState {
         let state = self.states.get(id).unwrap();
-        return state;
+        state
     }
     /// Returns a list of all states present in the DFA
     pub fn get_states(&self) -> Vec<DFAState> {
         self.states.clone()
     }
 
-    fn set_accept_category(&mut self, category: &String) {
+    fn set_accept_category(&mut self, category: &str) {
         let accept_states = self.accept_states.clone();
 
         for accept_state in accept_states.iter_ones() {
             let state = self.states.get_mut(accept_state).unwrap();
             let old_category = &state.category;
             if old_category.is_empty() {
-                state.set_category(category.clone());
+                state.set_category(category.to_string());
             }
         }
     }
@@ -273,21 +267,18 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
         let transitions = state.get_transitions();
 
         let eps_transitions = transitions.get(&Symbol::Epsilon);
-        match eps_transitions {
-            Some(targets) => {
-                for target in targets {
-                    let target = *target; // Unboxing the value
-                    if !visited[target] {
-                        visited.set(target, true);
-                        nfa_states.push_back(target);
-                    }
+        if let Some(targets) = eps_transitions {
+            for target in targets {
+                let target = *target; // Unboxing the value
+                if !visited[target] {
+                    visited.set(target, true);
+                    nfa_states.push_back(target);
                 }
             }
-            None => {}
         }
         epsilon_closure.set(state.get_id(), true); // Adding the state itself to the epsilon closure
     }
-    return epsilon_closure;
+    epsilon_closure
 }
 
 // This function returns the set of states accessible via char c within the set q
@@ -308,7 +299,7 @@ fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
             result.set(state_id, true);
         }
     }
-    return result;
+    result
 }
 
 fn compare_transitions(
@@ -348,7 +339,7 @@ fn compare_transitions(
             }
         }
     }
-    return same_transitions;
+    same_transitions
 }
 
 fn get_lookup_table(dfa: &DFA) -> LookupTable {
@@ -418,7 +409,7 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
             break;
         }
     }
-    return lookup_table;
+    lookup_table
 }
 fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
     let mut result = DFA::new(); // Set up result DFA
@@ -455,7 +446,7 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
             None => {
                 reorder_map.insert(state_id, next_id);
                 let reordered_id = next_id;
-                next_id = next_id + 1;
+                next_id += 1;
                 reordered_id
             }
         }; // Get the re-ordered equivalent state or add one
@@ -472,14 +463,14 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
             let symbol = transition.0.clone();
             let target = transition.1;
 
-            let reorder_target_id = match reorder_map.get(&target) {
+            let reorder_target_id = match reorder_map.get(target) {
                 // If not present, take the next available state and map it to the current
                 // un-ordered state
                 Some(&id) => id,
                 None => {
                     let state_id = next_id;
                     reorder_map.insert(*target, state_id);
-                    next_id = next_id + 1; // Pick the next available id
+                    next_id += 1; // Pick the next available id
                     state_id
                 }
             };
@@ -505,12 +496,12 @@ fn reorder_minimal_dfa(dfa: &DFA) -> DFA {
         result.set_accept_category(category);
     }
 
-    return result;
+    result
 }
 /// Apply Hopcroft's algorithm on a provided DFA to minimize it. If save_minimal_dfa is set to true,
 /// the constructed minimal DFA is saved as a jpg.
 pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
-    let lookup_table = get_lookup_table(&dfa);
+    let lookup_table = get_lookup_table(dfa);
     let sets = lookup_table.set_to_states_map.values();
 
     // Create a new DFA
@@ -566,7 +557,7 @@ pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
             let destination_state = transition.1;
             let destination_set = lookup_table
                 .state_to_set_map
-                .get(&destination_state)
+                .get(destination_state)
                 .unwrap();
 
             minimal_dfa.states[*current_set]
@@ -582,11 +573,11 @@ pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
     result.regex = regex.to_string();
 
     if save_minimal_dfa {
-        let filename = format!("constructed_minimal_dfa");
+        let filename = "constructed_minimal_dfa".to_string();
         result.show_fa(&filename);
     }
 
-    return result; // We need to always reorder now as visualization is possible
+    result // We need to always reorder now as visualization is possible
 }
 ///  Apply the subset construction algorithm on an NFA to build a DFA. If save_dfa is set to true,
 ///  the constructed DFA is saved as a jpg.
@@ -606,7 +597,7 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     let mut nfa_states = BitVec::repeat(false, nfa.get_num_states()); // Get the initial nfa states
     nfa_states.set(n0, true); // Add the start state to nfa states set
 
-    let q0 = get_epsilon_closure(&nfa, nfa_states); // Get its epsilon closure
+    let q0 = get_epsilon_closure(nfa, nfa_states); // Get its epsilon closure
     q_list.insert(q0.clone(), di); // Add it to the mapping
     work_list.push_back(q0.clone()); // Add the first nfa states set to the work list
 
@@ -628,11 +619,11 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     while !work_list.is_empty() {
         let q = work_list.pop_front().unwrap();
         for c in dfa_alphabet.iter() {
-            let end_states = delta(&nfa, &q, *c);
+            let end_states = delta(nfa, &q, *c);
             if end_states.not_any() {
                 continue;
             }
-            let t = get_epsilon_closure(&nfa, end_states);
+            let t = get_epsilon_closure(nfa, end_states);
 
             if !q_list.contains_key(&t) {
                 // check if di is as an acceptor state
@@ -661,11 +652,11 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     let regex = nfa.get_regex();
     result.regex = regex.to_string();
     if save_dfa {
-        let filename = format!("constructed_dfa");
+        let filename = "constructed_dfa".to_string();
         result.show_fa(&filename);
     }
 
-    return result;
+    result
 }
 
 #[cfg(test)]

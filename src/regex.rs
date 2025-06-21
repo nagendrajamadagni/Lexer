@@ -129,18 +129,14 @@ fn balanced_brackets(regex: &str) -> bool {
 
 // If these characters are found in a base term then it is invalid
 fn nchar_is_valid(nchar: char) -> bool {
-    match nchar {
-        '*' | '|' | '?' | ')' | ']' | '{' | '}' => false,
-        _ => true,
-    }
+    !matches!(nchar, '*' | '|' | '?' | ')' | ']' | '{' | '}')
 }
 
 fn is_escape_char(escape_ch: char) -> bool {
-    match escape_ch {
-        'n' | 't' | 'r' | '\\' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '*' | '+' | '?'
-        | '.' => true,
-        _ => false,
-    }
+    matches!(
+        escape_ch,
+        'n' | 't' | 'r' | '\\' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '*' | '+' | '?' | '.'
+    )
 }
 
 fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize), RegExError> {
@@ -155,7 +151,7 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
 
     if regex.chars().nth(new_start).unwrap() == '^' {
         negation = true;
-        new_start = new_start + 1;
+        new_start += 1;
     }
 
     while new_start < regex.len() && regex.chars().nth(new_start).unwrap() != ']' {
@@ -168,41 +164,39 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
             for char in char_start..=char_end {
                 char_set.insert(char);
             }
-            new_start = new_start + 3;
-        } else {
-            if regex.chars().nth(new_start).unwrap() == '\\' {
-                if !is_escape_char(regex.chars().nth(new_start + 1).unwrap()) {
+            new_start += 3;
+        } else if regex.chars().nth(new_start).unwrap() == '\\' {
+            if !is_escape_char(regex.chars().nth(new_start + 1).unwrap()) {
+                return Err(RegExError::InvalidEscapeCharacter(
+                    regex.chars().nth(new_start + 1).unwrap(),
+                ));
+            }
+            match regex.chars().nth(new_start + 1).unwrap() {
+                'n' => char_set.insert('\n'),
+                't' => char_set.insert('\t'),
+                'r' => char_set.insert('\r'),
+                '\\' => char_set.insert('\\'),
+                '(' => char_set.insert('('),
+                ')' => char_set.insert(')'),
+                '[' => char_set.insert('['),
+                ']' => char_set.insert(']'),
+                '{' => char_set.insert('{'),
+                '}' => char_set.insert('}'),
+                '|' => char_set.insert('|'),
+                '*' => char_set.insert('*'),
+                '+' => char_set.insert('+'),
+                '?' => char_set.insert('?'),
+                '.' => char_set.insert('.'),
+                _ => {
                     return Err(RegExError::InvalidEscapeCharacter(
                         regex.chars().nth(new_start + 1).unwrap(),
-                    ));
+                    ))
                 }
-                match regex.chars().nth(new_start + 1).unwrap() {
-                    'n' => char_set.insert('\n'),
-                    't' => char_set.insert('\t'),
-                    'r' => char_set.insert('\r'),
-                    '\\' => char_set.insert('\\'),
-                    '(' => char_set.insert('('),
-                    ')' => char_set.insert(')'),
-                    '[' => char_set.insert('['),
-                    ']' => char_set.insert(']'),
-                    '{' => char_set.insert('{'),
-                    '}' => char_set.insert('}'),
-                    '|' => char_set.insert('|'),
-                    '*' => char_set.insert('*'),
-                    '+' => char_set.insert('+'),
-                    '?' => char_set.insert('?'),
-                    '.' => char_set.insert('.'),
-                    _ => {
-                        return Err(RegExError::InvalidEscapeCharacter(
-                            regex.chars().nth(new_start + 1).unwrap(),
-                        ))
-                    }
-                };
-                new_start = new_start + 2;
-            } else {
-                char_set.insert(regex.chars().nth(new_start).unwrap());
-                new_start = new_start + 1;
-            }
+            };
+            new_start += 2;
+        } else {
+            char_set.insert(regex.chars().nth(new_start).unwrap());
+            new_start += 1;
         }
     }
 
@@ -218,10 +212,10 @@ fn parse_char_class(regex: &str, start: usize) -> Result<(HashSet<char>, usize),
         ascii_set.insert('\t');
 
         let difference_set = ascii_set.difference(&char_set).cloned().collect();
-        return Ok((difference_set, new_start));
+        Ok((difference_set, new_start))
         // Calculate the difference and return
     } else {
-        return Ok((char_set, new_start));
+        Ok((char_set, new_start))
     }
 }
 
@@ -295,12 +289,12 @@ fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usiz
 
     while regex.chars().nth(pos).unwrap() == ' ' {
         // Skip any spaces after the LBrace
-        pos = pos + 1;
+        pos += 1;
     }
 
     if regex.chars().nth(pos).unwrap() == '-' {
         atmost = true;
-        pos = pos + 1;
+        pos += 1;
     }
 
     while regex.chars().nth(pos).unwrap() != '}' && regex.chars().nth(pos).unwrap() != '-' {
@@ -323,7 +317,7 @@ fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usiz
         };
 
         lower_number = (lower_number * 10) + digit;
-        pos = pos + 1;
+        pos += 1;
     }
 
     if regex.chars().nth(pos).unwrap() == '}' {
@@ -336,11 +330,11 @@ fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usiz
 
     while regex.chars().nth(pos).unwrap() == ' ' {
         // Skip any spaces after the number
-        pos = pos + 1;
+        pos += 1;
     }
 
     if regex.chars().nth(pos).unwrap() == '-' {
-        pos = pos + 1;
+        pos += 1;
     } else {
         let err = Report::new(RegExError::InvalidQuantifier(
             regex.chars().nth(pos).unwrap(),
@@ -375,7 +369,7 @@ fn get_numeric_quantifier(regex: &str, start: usize) -> Result<(Quantifier, usiz
             }
         };
         higher_number = (higher_number * 10) + digit;
-        pos = pos + 1;
+        pos += 1;
     }
 
     if lower_number >= higher_number {
@@ -439,25 +433,25 @@ fn parse_regex(regex: &str, start: usize) -> Result<(RegEx, usize)> {
         return Err(err);
     }
 
-    if regex.len() == 0 {
+    if regex.is_empty() {
         let err = Report::new(RegExError::InvalidRegexError(regex.to_string()));
         return Err(err);
     }
 
     let (term, new_start) = parse_term(regex, start)?;
     if new_start >= regex.len() {
-        return Ok((RegEx::SimpleRegex(term), new_start));
+        Ok((RegEx::SimpleRegex(term), new_start))
     } else if regex.chars().nth(new_start).unwrap() == '|' {
         let (next_regex, new_start) = parse_regex(regex, new_start + 1)?;
-        return Ok((RegEx::AlterRegex(term, Box::new(next_regex)), new_start));
+        Ok((RegEx::AlterRegex(term, Box::new(next_regex)), new_start))
     } else {
-        return Ok((RegEx::SimpleRegex(term), new_start));
+        Ok((RegEx::SimpleRegex(term), new_start))
     }
 }
 
 fn build_syntax_tree(regex: &str) -> Result<RegEx> {
     let (syntax_tree, _) = parse_regex(regex, 0)?;
-    return Ok(syntax_tree);
+    Ok(syntax_tree)
 }
 /// Parse a list of microsyntaxes provided and return the parse trees
 pub fn parse_microsyntax_list(
@@ -472,7 +466,7 @@ pub fn parse_microsyntax_list(
 
         syntax_tree_list.push_back((regex, syntax_tree, category));
     }
-    return Ok(syntax_tree_list);
+    Ok(syntax_tree_list)
 }
 /// Parse a file containing microsyntaxes and return the parse trees
 pub fn read_microsyntax_file(file_path: String) -> Result<Vec<(String, String)>, RegExError> {
@@ -534,11 +528,7 @@ mod regex_tests {
                 Base::Character(c),
                 None,
             ))) if *c == expected_char => {}
-            _ => assert!(
-                false,
-                "Expected simple char '{}', got {:?}",
-                expected_char, regex
-            ),
+            _ => panic!("Expected simple char '{}', got {:?}", expected_char, regex),
         }
     }
 
@@ -548,11 +538,7 @@ mod regex_tests {
                 Base::Exp(inner_regex),
                 None,
             ))) => assert_simple_char(inner_regex, expected_char),
-            _ => assert!(
-                false,
-                "Expected grouped char '{}', got {:?}",
-                expected_char, regex
-            ),
+            _ => panic!("Expected grouped char '{}', got {:?}", expected_char, regex),
         }
     }
 
@@ -565,14 +551,9 @@ mod regex_tests {
                 (Quantifier::Star, Quantifier::Star) => {}
                 (Quantifier::Plus, Quantifier::Plus) => {}
                 (Quantifier::Question, Quantifier::Question) => {}
-                _ => assert!(
-                    false,
-                    "Expected quantifier {:?}, got {:?}",
-                    expected_quantifier, q
-                ),
+                _ => panic!("Expected quantifier {:?}, got {:?}", expected_quantifier, q),
             },
-            _ => assert!(
-                false,
+            _ => panic!(
                 "Expected quantified char '{}', got {:?}",
                 expected_char, regex
             ),
@@ -587,11 +568,7 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::Character(c1), None))
                     if c1 == first_char => {}
-                _ => assert!(
-                    false,
-                    "Expected first char '{}', got {:?}",
-                    first_char, box_term
-                ),
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
             },
             RegEx::SimpleRegex(Term::ConcatTerm(
                 Factor::SimpleFactor(Base::Character(c2), None),
@@ -599,11 +576,7 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter(c1), None))
                     if c1 == first_char => {}
-                _ => assert!(
-                    false,
-                    "Expected first char '{}', got {:?}",
-                    first_char, box_term
-                ),
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
             },
             RegEx::SimpleRegex(Term::ConcatTerm(
                 Factor::SimpleFactor(Base::EscapeCharacter(c2), None),
@@ -611,11 +584,7 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::Character(c1), None))
                     if c1 == first_char => {}
-                _ => assert!(
-                    false,
-                    "Expected first char '{}', got {:?}",
-                    first_char, box_term
-                ),
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
             },
             RegEx::SimpleRegex(Term::ConcatTerm(
                 Factor::SimpleFactor(Base::EscapeCharacter(c2), None),
@@ -623,14 +592,9 @@ mod regex_tests {
             )) if *c2 == second_char => match **box_term {
                 Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter(c1), None))
                     if c1 == first_char => {}
-                _ => assert!(
-                    false,
-                    "Expected first char '{}', got {:?}",
-                    first_char, box_term
-                ),
+                _ => panic!("Expected first char '{}', got {:?}", first_char, box_term),
             },
-            _ => assert!(
-                false,
+            _ => panic!(
                 "Expected concatenation of '{}' and '{}', got {:?}",
                 first_char, second_char, regex
             ),
@@ -647,14 +611,12 @@ mod regex_tests {
                     Base::Character(c2),
                     None,
                 ))) if c2 == second_char => {}
-                _ => assert!(
-                    false,
+                _ => panic!(
                     "Expected second alternative '{}', got {:?}",
                     second_char, box_regex
                 ),
             },
-            _ => assert!(
-                false,
+            _ => panic!(
                 "Expected alternation of '{}' and '{}', got {:?}",
                 first_char, second_char, regex
             ),
@@ -748,8 +710,8 @@ mod regex_tests {
         let result = parse_regex(regex, 0);
         assert!(result.is_err());
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::UnbalancedParenthesisError(_) => assert!(true),
-            err => assert!(false, "Expected UnbalancedParenthesisError, got {:?}", err),
+            RegExError::UnbalancedParenthesisError(_) => {}
+            err => panic!("Expected UnbalancedParenthesisError, got {:?}", err),
         }
     }
 
@@ -759,8 +721,8 @@ mod regex_tests {
         let result = parse_regex(regex, 0);
         assert!(result.is_err(), "Expected Error got {:?}", result);
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidEscapeCharacter(_) => assert!(true),
-            err => assert!(false, "Expected InvalidEscapeCharacter, got {:?}", err),
+            RegExError::InvalidEscapeCharacter(_) => {}
+            err => panic!("Expected InvalidEscapeCharacter, got {:?}", err),
         }
     }
 
@@ -782,7 +744,7 @@ mod regex_tests {
                 assert!(set.contains(&'b'));
                 assert!(set.contains(&'c'));
             }
-            _ => assert!(false, "Expected character set, got {:?}", base),
+            _ => panic!("Expected character set, got {:?}", base),
         }
     }
 
@@ -804,7 +766,7 @@ mod regex_tests {
                 assert!(set.contains(&'b'));
                 assert!(set.contains(&'c'));
             }
-            _ => assert!(false, "Expected character set, got {:?}", base),
+            _ => panic!("Expected character set, got {:?}", base),
         }
     }
 
@@ -826,7 +788,7 @@ mod regex_tests {
                 assert!(set.contains(&'b'));
                 assert!(set.contains(&'?'));
             }
-            _ => assert!(false, "Expected character set, got {:?}", base),
+            _ => panic!("Expected character set, got {:?}", base),
         }
     }
 
@@ -838,12 +800,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidCharacterRange(_, _) => assert!(true),
-            result => assert!(
-                false,
-                "Expected invalid character range error. Got {:?}",
-                result
-            ),
+            RegExError::InvalidCharacterRange(_, _) => {}
+            result => panic!("Expected invalid character range error. Got {:?}", result),
         }
     }
 
@@ -871,15 +829,15 @@ mod regex_tests {
                         RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                             Base::Character('b'),
                             None,
-                        ))) => assert!(true),
-                        _ => assert!(false),
+                        ))) => {}
+                        _ => unreachable!(),
                     },
-                    _ => assert!(false),
+                    _ => unreachable!(),
                 },
-                _ => assert!(false),
+                _ => unreachable!(),
             },
 
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -894,8 +852,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Exact(5) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Exact(5) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -908,8 +866,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Exact(5)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -924,8 +882,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Exact(456) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Exact(456) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -938,8 +896,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Exact(456)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -952,8 +910,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -961,8 +919,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -977,8 +935,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Range(5, 7) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Range(5, 7) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -991,8 +949,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Range(5, 7)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1007,8 +965,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Range(45, 64) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Range(45, 64) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1021,8 +979,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Range(45, 64)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1035,8 +993,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1044,8 +1002,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1058,8 +1016,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidRegexError(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidRegexError(_) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1067,8 +1025,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidRegexError(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidRegexError(_) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1083,8 +1041,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Atleast(5) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Atleast(5) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1097,8 +1055,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Atleast(5)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1113,8 +1071,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Atleast(45) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Atleast(45) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1127,8 +1085,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Atleast(45)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1141,8 +1099,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1150,8 +1108,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1166,8 +1124,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Atmost(5) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Atmost(5) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1180,8 +1138,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Atmost(5)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1196,8 +1154,8 @@ mod regex_tests {
         let result = result.unwrap().0;
 
         match result {
-            Quantifier::Atmost(45) => assert!(true),
-            _ => assert!(false),
+            Quantifier::Atmost(45) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1210,8 +1168,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::Character('a'),
                 Some(Quantifier::Atmost(45)),
-            ))) => assert!(true),
-            _ => assert!(false),
+            ))) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1224,8 +1182,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
 
         let result = parse_regex(regex, 0);
@@ -1233,8 +1191,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidQuantifier(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidQuantifier(_) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1247,8 +1205,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::UnbalancedParenthesisError(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::UnbalancedParenthesisError(_) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1266,8 +1224,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::EscapeCharacter('{'),
                 None,
-            ))) => assert!(true),
-            _ => assert!(false, "Expected {{, got {:?}", result),
+            ))) => {}
+            _ => panic!("Expected {{, got {:?}", result),
         }
     }
 
@@ -1280,8 +1238,8 @@ mod regex_tests {
         assert!(result.is_err());
 
         match result.unwrap_err().downcast_ref().unwrap() {
-            RegExError::InvalidRegexError(_) => assert!(true),
-            _ => assert!(false),
+            RegExError::InvalidRegexError(_) => {}
+            _ => unreachable!(),
         }
     }
 
@@ -1300,12 +1258,10 @@ mod regex_tests {
                 Factor::SimpleFactor(Base::EscapeCharacter('}'), None),
                 lterm,
             )) => match *lterm {
-                Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter('{'), None)) => {
-                    assert!(true)
-                }
-                _ => assert!(false),
+                Term::SimpleTerm(Factor::SimpleFactor(Base::EscapeCharacter('{'), None)) => {}
+                _ => unreachable!(),
             },
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -1323,8 +1279,8 @@ mod regex_tests {
             RegEx::SimpleRegex(Term::SimpleTerm(Factor::SimpleFactor(
                 Base::EscapeCharacter('.'),
                 None,
-            ))) => assert!(true),
-            _ => assert!(false, "Expected {{, got {:?}", result),
+            ))) => {}
+            _ => panic!("Expected {{, got {:?}", result),
         }
     }
 
@@ -1351,7 +1307,7 @@ mod regex_tests {
                 }
                 assert!(set.contains(&'\t'));
             }
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -1372,7 +1328,7 @@ mod regex_tests {
             ))) => {
                 assert!(set.contains(&'.'));
             }
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -1393,7 +1349,7 @@ mod regex_tests {
             ))) => {
                 assert!(set.contains(&'.'));
             }
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -1417,7 +1373,7 @@ mod regex_tests {
                 }
                 assert!(set.contains(&'A'));
             }
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -1442,7 +1398,7 @@ mod regex_tests {
                 assert!(set.contains(&'^'));
                 assert!(!set.contains(&'A'));
             }
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 }
