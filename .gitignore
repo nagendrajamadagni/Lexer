@@ -11,3 +11,4 @@ Dockerfile
 .DS_STORE
 *.gz
 Makefile
+*.svg
