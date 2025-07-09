@@ -159,6 +159,14 @@ pub enum ScannerError {
     EpsilonInDFA,
     /// Found a bad token which cannot be categorized in the list of syntactic categories provided
     BadToken(String),
+    /// Failed to create a file to store the scanner data
+    FileCreateError(String),
+    /// Failed to write scanner data into the file
+    FileWriteError,
+    /// Failed to read scanner data from the file
+    FileReadError(String),
+    /// Failed to parse the data read from the file
+    JSONParseError(String),
 }
 
 impl std::fmt::Display for ScannerError {
@@ -167,6 +175,28 @@ impl std::fmt::Display for ScannerError {
             ScannerError::EpsilonInDFA => write!(f, "Error: Found an epsilon transition in a DFA!"),
             ScannerError::BadToken(token) => {
                 write!(f, "Error: Bad token found! {} is not a valid token!", token)
+            }
+            ScannerError::FileCreateError(error) => write!(
+                f,
+                "Error: Failed to create a file to save the scanner! - {}",
+                error
+            ),
+            ScannerError::FileWriteError => {
+                write!(f, "Error: Failed to write scanner data to the file!")
+            }
+            ScannerError::FileReadError(error) => {
+                write!(
+                    f,
+                    "Error: Failed to read scanner data from the file! {}",
+                    error
+                )
+            }
+            ScannerError::JSONParseError(error) => {
+                write!(
+                    f,
+                    "Error: Failed to parse the scanner data in the file! {}",
+                    error
+                )
             }
         }
     }
@@ -547,12 +577,24 @@ impl Scanner {
         println!("{:?}", self.classifier_table);
     }
 
-    pub fn save_scanner(&self, file_name: &str) {
+    pub fn save_scanner(&self, file_name: &str) -> Result<(), ScannerError> {
         let json_string = serde_json::to_string_pretty(self).unwrap();
 
-        let mut file = File::create(file_name).unwrap();
+        let file = File::create(file_name);
 
-        writeln!(file, "{}", json_string).unwrap();
+        let mut file = match file {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(ScannerError::FileCreateError(error.to_string()));
+            }
+        };
+
+        let result = writeln!(file, "{}", json_string);
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(_) => Err(ScannerError::FileWriteError),
+        }
     }
 }
 /// Construct a scanner for the provided DFA. For best performance, always provide the minized DFA.
@@ -567,12 +609,23 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
 }
 
 /// Load a scanner from a saved json file
-pub fn load_scanner(file_name: &str) -> Result<Scanner> {
-    let file = File::open(file_name)?;
+pub fn load_scanner(file_name: &str) -> Result<Scanner, ScannerError> {
+    let file = File::open(file_name);
+
+    let file = match file {
+        Ok(file) => file,
+        Err(error) => return Err(ScannerError::FileReadError(error.to_string())),
+    };
 
     let buf_reader = BufReader::new(file);
 
-    let scanner: Scanner = serde_json::from_reader(buf_reader).unwrap();
+    let result = serde_json::from_reader(buf_reader);
+
+    let scanner: Scanner = match result {
+        Ok(scanner) => scanner,
+        Err(error) => return Err(ScannerError::JSONParseError(error.to_string())),
+    };
+
     Ok(scanner)
 }
 
