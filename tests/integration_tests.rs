@@ -228,16 +228,13 @@ mod integration_tests {
     }
 
     #[test]
-    fn test_save_scanner() {
+    fn test_save_load_scanner() {
         let scanner = get_scanner("test_data/everything.mst");
 
         let result = scanner.save_scanner("test_data/everything_scanner.scn");
 
         assert!(result.is_ok());
-    }
 
-    #[test]
-    fn test_load_scanner() {
         let scanner = load_scanner("test_data/everything_scanner.scn");
 
         assert!(scanner.is_ok());
