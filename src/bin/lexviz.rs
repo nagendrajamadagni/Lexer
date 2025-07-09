@@ -2,7 +2,9 @@ use clap::{Arg, Command};
 use color_eyre::eyre::{Report, Result};
 use lexviz::{
     construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
-    read_microsyntax_file, scanner::load_scanner, visualize, LexerError,
+    read_microsyntax_file,
+    scanner::{load_scanner, Scanner},
+    visualize, LexerError,
 };
 
 fn main() -> Result<()> {
@@ -62,6 +64,20 @@ fn main() -> Result<()> {
                             .long("output")
                             .help("The output file to store the lexer's output")
                             .value_name("OUTPUT RESULT FILE")
+                            .value_parser(clap::value_parser!(String))
+                        )
+                        .arg(Arg::new("save-scanner")
+                            .short('c')
+                            .long("save-scanner")
+                            .help("Save the scanner configuration into a file to load it later")
+                            .value_name("SCANNER FILE")
+                            .value_parser(clap::value_parser!(String))
+                        )
+                        .arg(Arg::new("load-scanner")
+                            .short('l')
+                            .long("load-scanner")
+                            .help("Load the scanner configuration from a file which was saved earlier")
+                            .value_name("LOAD FILE")
                             .value_parser(clap::value_parser!(String))
                         )
                         .arg(
@@ -160,18 +176,40 @@ fn main() -> Result<()> {
         }
     };
 
-    let syntax_tree_list = parse_microsyntax_list(regex_list).unwrap();
+    let scanner_file_path = args
+        .get_one::<String>("save-scanner")
+        .map(|file_path| file_path.to_string());
 
-    let nfa = construct_nfa(syntax_tree_list, save_nfa).unwrap();
+    let load_file_path = args
+        .get_one::<String>("load-scanner")
+        .map(|file_path| file_path.to_string());
 
-    let dfa = construct_dfa(&nfa, save_dfa);
-    let minimal_dfa = construct_minimal_dfa(&dfa, save_minimal_dfa);
+    let scanner: Scanner = if load_file_path.is_some() && visualize_opt == "none" {
+        let file_path = load_file_path.unwrap();
+        load_scanner(&file_path).unwrap()
+    } else {
+        let syntax_tree_list = parse_microsyntax_list(regex_list).unwrap();
 
-    //let scanner = construct_scanner(&minimal_dfa);
+        let nfa = construct_nfa(syntax_tree_list, save_nfa).unwrap();
 
-    //scanner.save_scanner("scanner.scn");
+        let dfa = construct_dfa(&nfa, save_dfa);
+        let minimal_dfa = construct_minimal_dfa(&dfa, save_minimal_dfa);
 
-    let scanner = load_scanner("scanner.scn").unwrap();
+        if visualize_opt == "nfa" {
+            visualize(&nfa);
+        } else if visualize_opt == "dfa" {
+            visualize(&dfa);
+        } else if visualize_opt == "minimal" {
+            visualize(&minimal_dfa);
+        }
+
+        construct_scanner(&minimal_dfa)
+    };
+
+    if scanner_file_path.is_some() {
+        let file_path = scanner_file_path.unwrap();
+        scanner.save_scanner(&file_path).unwrap();
+    }
 
     let token_list = scanner
         .scan(
@@ -188,14 +226,6 @@ fn main() -> Result<()> {
             token.get_token(),
             token.get_category()
         );
-    }
-
-    if visualize_opt == "nfa" {
-        visualize(&nfa);
-    } else if visualize_opt == "dfa" {
-        visualize(&dfa);
-    } else if visualize_opt == "minimal" {
-        visualize(&minimal_dfa);
     }
 
     Ok(())
