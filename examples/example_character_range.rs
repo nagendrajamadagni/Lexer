@@ -13,9 +13,7 @@ fn main() {
 
     let src_file_path = path.join("examples/abc_def").to_str().unwrap().to_string();
 
-    let mut regex_list: Vec<(String, String)> = Vec::new();
-
-    regex_list.push((regex.to_string(), category.to_string()));
+    let regex_list: Vec<(String, String)> = vec![(regex.to_string(), category.to_string())];
 
     let syntax_tree = parse_microsyntax_list(regex_list).unwrap();
 

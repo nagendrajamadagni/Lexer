@@ -37,8 +37,7 @@ mod integration_tests_helper {
 
         let dfa = construct_minimal_dfa(&dfa, false);
 
-        let scanner = construct_scanner(&dfa);
-        scanner
+        construct_scanner(&dfa)
     }
 }
 
@@ -50,24 +49,25 @@ mod integration_tests {
     #[test]
     fn test_valid_invalid_lex() {
         let scanner = get_scanner("test_data/sample.mst");
-        let mut expected_list: Vec<Token> = Vec::new();
-        expected_list.push(get_token("main", "IDENTIFIER"));
-        expected_list.push(get_token("(", "LPAREN"));
-        expected_list.push(get_token("input", "IDENTIFIER"));
-        expected_list.push(get_token(")", "RPAREN"));
-        expected_list.push(get_token("{", "LBRACE"));
-        expected_list.push(get_token("add1", "KEYWORD"));
-        expected_list.push(get_token("(", "LPAREN"));
-        expected_list.push(get_token("sub1", "KEYWORD"));
-        expected_list.push(get_token("(", "LPAREN"));
-        expected_list.push(get_token("negate", "KEYWORD"));
-        expected_list.push(get_token("(", "LPAREN"));
-        expected_list.push(get_token("5", "NUMBER"));
-        expected_list.push(get_token(")", "RPAREN"));
-        expected_list.push(get_token(")", "RPAREN"));
-        expected_list.push(get_token(")", "RPAREN"));
-        expected_list.push(get_token(";", "TERMINATOR"));
-        expected_list.push(get_token("}", "RBRACE"));
+        let expected_list: Vec<Token> = vec![
+            get_token("main", "IDENTIFIER"),
+            get_token("(", "LPAREN"),
+            get_token("input", "IDENTIFIER"),
+            get_token(")", "RPAREN"),
+            get_token("{", "LBRACE"),
+            get_token("add1", "KEYWORD"),
+            get_token("(", "LPAREN"),
+            get_token("sub1", "KEYWORD"),
+            get_token("(", "LPAREN"),
+            get_token("negate", "KEYWORD"),
+            get_token("(", "LPAREN"),
+            get_token("5", "NUMBER"),
+            get_token(")", "RPAREN"),
+            get_token(")", "RPAREN"),
+            get_token(")", "RPAREN"),
+            get_token(";", "TERMINATOR"),
+            get_token("}", "RBRACE"),
+        ];
 
         // assert reading file was successful
 
@@ -90,8 +90,8 @@ mod integration_tests {
         let err = err.downcast_ref().unwrap();
 
         match err {
-            ScannerError::BadToken(_) => assert!(true),
-            _ => assert!(false),
+            ScannerError::BadToken(_) => {}
+            _ => panic!("Expeced bad token!"),
         }
     }
 
@@ -101,30 +101,27 @@ mod integration_tests {
 
         let src_file_path = "test_data/comments.snek".to_string();
 
-        let mut skip_list: Vec<String> = Vec::new();
-        skip_list.push("COMMENT".to_string());
+        let skip_list: Vec<String> = vec!["COMMENT".to_string()];
 
         let token_list = scanner.scan(src_file_path, None, false, Some(skip_list));
         assert!(token_list.is_ok());
 
         let token_list = token_list.unwrap();
 
-        let mut expected_list: Vec<Token> = Vec::new();
-        expected_list.push(get_token("add1", "KEYWORD"));
-        expected_list.push(get_token(" ", "WHITESPACE"));
-        expected_list.push(get_token("4", "NUMBER"));
-        expected_list.push(get_token(" ", "WHITESPACE"));
-        expected_list.push(get_token("\n", "WHITESPACE"));
-        expected_list.push(get_token(
-            "\"This is a string constant\"",
-            "STRING_CONSTANT",
-        ));
-        expected_list.push(get_token("\n", "WHITESPACE"));
-        expected_list.push(get_token(
-            "\"This is a # inside a string constant\"",
-            "STRING_CONSTANT",
-        ));
-        expected_list.push(get_token("\n", "WHITESPACE"));
+        let expected_list: Vec<Token> = vec![
+            get_token("add1", "KEYWORD"),
+            get_token(" ", "WHITESPACE"),
+            get_token("4", "NUMBER"),
+            get_token(" ", "WHITESPACE"),
+            get_token("\n", "WHITESPACE"),
+            get_token("\"This is a string constant\"", "STRING_CONSTANT"),
+            get_token("\n", "WHITESPACE"),
+            get_token(
+                "\"This is a # inside a string constant\"",
+                "STRING_CONSTANT",
+            ),
+            get_token("\n", "WHITESPACE"),
+        ];
 
         assert_eq!(token_list, expected_list);
     }
@@ -140,8 +137,7 @@ mod integration_tests {
 
         let token_list = token_list.unwrap();
 
-        let mut expected_list: Vec<Token> = Vec::new();
-        expected_list.push(get_token("()", "EMPTY"));
+        let expected_list: Vec<Token> = vec![get_token("()", "EMPTY")];
 
         assert_eq!(token_list, expected_list);
     }
@@ -160,10 +156,11 @@ mod integration_tests {
 
         let token_list = token_list.unwrap();
 
-        let mut expected_list: Vec<Token> = Vec::new();
-        expected_list.push(get_token("aaaaa", "ATLEAST_FIVE_A"));
-        expected_list.push(get_token("aaaa", "ATMOST_FIVE_A"));
-        expected_list.push(get_token("aaaaaa", "ATLEAST_FIVE_A"));
+        let expected_list: Vec<Token> = vec![
+            get_token("aaaaa", "ATLEAST_FIVE_A"),
+            get_token("aaaa", "ATMOST_FIVE_A"),
+            get_token("aaaaaa", "ATLEAST_FIVE_A"),
+        ];
 
         assert_eq!(token_list, expected_list);
     }
@@ -182,10 +179,11 @@ mod integration_tests {
 
         let token_list = token_list.unwrap();
 
-        let mut expected_list: Vec<Token> = Vec::new();
-        expected_list.push(get_token("aaaaa", "THREE_FIVE_A"));
-        expected_list.push(get_token("aaa", "THREE_FIVE_A"));
-        expected_list.push(get_token("aaaa", "THREE_FIVE_A"));
+        let expected_list: Vec<Token> = vec![
+            get_token("aaaaa", "THREE_FIVE_A"),
+            get_token("aaa", "THREE_FIVE_A"),
+            get_token("aaaa", "THREE_FIVE_A"),
+        ];
 
         assert_eq!(token_list, expected_list);
     }
@@ -203,8 +201,8 @@ mod integration_tests {
         assert!(token_list.is_err());
 
         match token_list.unwrap_err().downcast_ref().unwrap() {
-            ScannerError::BadToken(_) => assert!(true),
-            _ => assert!(false),
+            ScannerError::BadToken(_) => {}
+            _ => panic!("Expected Bad Token Error!"),
         }
     }
 
@@ -220,11 +218,11 @@ mod integration_tests {
 
         let token_list = token_list.unwrap();
 
-        let mut expected_list: Vec<Token> = Vec::new();
-
-        expected_list.push(get_token("a", "EVERYTHING"));
-        expected_list.push(get_token("b", "EVERYTHING"));
-        expected_list.push(get_token("c", "EVERYTHING"));
+        let expected_list: Vec<Token> = vec![
+            get_token("a", "EVERYTHING"),
+            get_token("b", "EVERYTHING"),
+            get_token("c", "EVERYTHING"),
+        ];
 
         assert_eq!(token_list, expected_list);
     }
