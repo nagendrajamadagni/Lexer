@@ -39,3 +39,6 @@ path = "src/bin/lexviz.rs"
 test = true
 bench = false
 required-features = []
+
+[profile.release]
+debug = true
