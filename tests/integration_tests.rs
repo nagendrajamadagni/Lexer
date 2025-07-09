@@ -44,7 +44,7 @@ mod integration_tests_helper {
 mod integration_tests {
     use crate::integration_tests_helper::{get_scanner, get_token};
 
-    use lexviz::scanner::{ScannerError, Token};
+    use lexviz::scanner::{load_scanner, ScannerError, Token};
 
     #[test]
     fn test_valid_invalid_lex() {
@@ -209,6 +209,40 @@ mod integration_tests {
     #[test]
     fn test_dot_operator() {
         let scanner = get_scanner("test_data/everything.mst");
+
+        let src_file_path = "test_data/everything.snek".to_string();
+
+        let token_list = scanner.scan(src_file_path, None, true, None);
+
+        assert!(token_list.is_ok());
+
+        let token_list = token_list.unwrap();
+
+        let expected_list: Vec<Token> = vec![
+            get_token("a", "EVERYTHING"),
+            get_token("b", "EVERYTHING"),
+            get_token("c", "EVERYTHING"),
+        ];
+
+        assert_eq!(token_list, expected_list);
+    }
+
+    #[test]
+    fn test_save_scanner() {
+        let scanner = get_scanner("test_data/everything.mst");
+
+        let result = scanner.save_scanner("test_data/everything_scanner.scn");
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_load_scanner() {
+        let scanner = load_scanner("test_data/everything_scanner.scn");
+
+        assert!(scanner.is_ok());
+
+        let scanner = scanner.unwrap();
 
         let src_file_path = "test_data/everything.snek".to_string();
 
