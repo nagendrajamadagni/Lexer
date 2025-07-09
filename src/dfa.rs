@@ -276,8 +276,10 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
                 }
             }
         }
+
         epsilon_closure.set(state.get_id(), true); // Adding the state itself to the epsilon closure
     }
+
     epsilon_closure
 }
 
@@ -614,24 +616,34 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
         }
     }
 
-    let dfa_alphabet = result.alphabet.clone();
-
     while !work_list.is_empty() {
         let q = work_list.pop_front().unwrap();
-        for c in dfa_alphabet.iter() {
+        for c in nfa.get_alphabet().iter() {
+            // Since NFAs and DFAs have the same alphabet, and we
+            // cannot borrow the DFAs alphabet as immutable we
+            // borrow the NFAs alphabet
+            // Iterate over each alphabet in the dfa
             let end_states = delta(nfa, &q, *c);
             if end_states.not_any() {
                 continue;
             }
+
             let t = get_epsilon_closure(nfa, end_states);
 
-            if !q_list.contains_key(&t) {
-                // check if di is as an acceptor state
+            let di = if let Some(&existing_di) = q_list.get(&t) {
+                // This is an expensive operation
+                existing_di
+            } else {
                 let di = result.add_state();
-                q_list.insert(t.clone(), di);
+
+                q_list.insert(t.clone(), di); // This is an expensive operation
+
                 work_list.push_back(t.clone());
+
                 let has_common = (t.clone() & nfa_accepts).any();
+
                 if has_common {
+                    // check if di is as an acceptor state
                     result.accept_states.set(di, true);
                     for state in t.iter_ones() {
                         let category = nfa.get_state(state).unwrap().get_category();
@@ -640,15 +652,16 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
                         }
                     }
                 }
-            }
+                di
+            };
+
             // add a transition from diq to dit
-            let dq = q_list.get(&q).unwrap();
-            let di = q_list.get(&t).unwrap();
-            let di = *di;
+            let dq = q_list.get(&q).unwrap(); // This is an expensive operation
             let dq = *dq; // Unwrapping the box
             result.states[dq].transitions.insert(Symbol::Char(*c), di);
         }
     }
+
     let regex = nfa.get_regex();
     result.regex = regex.to_string();
     if save_dfa {
