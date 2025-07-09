@@ -169,6 +169,8 @@ fn main() -> Result<()> {
 
     let scanner = construct_scanner(&minimal_dfa);
 
+    scanner.save_scanner("scanner.scn");
+
     let token_list = scanner
         .scan(
             src_file_path,

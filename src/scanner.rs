@@ -4,6 +4,10 @@
 
 use bitvec::vec::BitVec;
 
+use serde::{Deserialize, Serialize, Serializer};
+
+use serde_json;
+
 use crate::dfa::DFA;
 use crate::fa::{Symbol, FA};
 use color_eyre::eyre::{Report, Result};
@@ -170,8 +174,31 @@ impl std::fmt::Display for ScannerError {
 
 impl std::error::Error for ScannerError {}
 
+fn serialize_classifier_table<S>(
+    classifier_table: &HashMap<Option<char>, usize>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    use serde::ser::SerializeMap;
+
+    let mut ser_map = serializer.serialize_map(Some(classifier_table.len()))?;
+
+    for (key, value) in classifier_table {
+        let key_str = match key {
+            Some(c) => c.to_string(),
+            None => "null".to_string(),
+        };
+        ser_map.serialize_entry(&key_str, value)?;
+    }
+    ser_map.end()
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Scanner {
     transition_table: Vec<Vec<usize>>, // Matrix of input characters and dfa states
+    #[serde(serialize_with = "serialize_classifier_table")]
     classifier_table: HashMap<Option<char>, usize>, // Mapping from alphabet to its class id
     token_type_table: HashMap<usize, String>, // Mapping of accept state number and token type
     error_state: usize,
@@ -487,6 +514,14 @@ impl Scanner {
     #[cfg(debug_assertions)]
     fn print_classifier_table(&self) {
         println!("{:?}", self.classifier_table);
+    }
+
+    pub fn save_scanner(&self, file_name: &str) {
+        let json_string = serde_json::to_string_pretty(self).unwrap();
+
+        let mut file = File::create(file_name).unwrap();
+
+        writeln!(file, "{}", json_string).unwrap();
     }
 }
 /// Construct a scanner for the provided DFA. For best performance, always provide the minized DFA.
