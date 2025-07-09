@@ -2,7 +2,7 @@ use clap::{Arg, Command};
 use color_eyre::eyre::{Report, Result};
 use lexviz::{
     construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
-    read_microsyntax_file, visualize, LexerError,
+    read_microsyntax_file, scanner::load_scanner, visualize, LexerError,
 };
 
 fn main() -> Result<()> {
@@ -167,9 +167,11 @@ fn main() -> Result<()> {
     let dfa = construct_dfa(&nfa, save_dfa);
     let minimal_dfa = construct_minimal_dfa(&dfa, save_minimal_dfa);
 
-    let scanner = construct_scanner(&minimal_dfa);
+    //let scanner = construct_scanner(&minimal_dfa);
 
-    scanner.save_scanner("scanner.scn");
+    //scanner.save_scanner("scanner.scn");
+
+    let scanner = load_scanner("scanner.scn").unwrap();
 
     let token_list = scanner
         .scan(

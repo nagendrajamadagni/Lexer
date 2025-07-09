@@ -4,7 +4,7 @@
 
 use bitvec::vec::BitVec;
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use serde_json;
 
@@ -195,10 +195,41 @@ where
     ser_map.end()
 }
 
+fn deserialize_classifier_table<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<Option<char>, usize>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let classifier_table: HashMap<String, usize> = HashMap::deserialize(deserializer)?;
+
+    let mut result = HashMap::new();
+
+    for (key, value) in classifier_table {
+        let key = if key == "null" {
+            None
+        } else if key.chars().count() == 1 {
+            Some(key.chars().next().unwrap())
+        } else {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid key for Option<char>: {}",
+                key
+            )));
+        };
+
+        result.insert(key, value);
+    }
+
+    Ok(result)
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Scanner {
     transition_table: Vec<Vec<usize>>, // Matrix of input characters and dfa states
-    #[serde(serialize_with = "serialize_classifier_table")]
+    #[serde(
+        serialize_with = "serialize_classifier_table",
+        deserialize_with = "deserialize_classifier_table"
+    )]
     classifier_table: HashMap<Option<char>, usize>, // Mapping from alphabet to its class id
     token_type_table: HashMap<usize, String>, // Mapping of accept state number and token type
     error_state: usize,
@@ -533,6 +564,16 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
     scanner.init_token_type_table(dfa);
 
     scanner
+}
+
+/// Load a scanner from a saved json file
+pub fn load_scanner(file_name: &str) -> Result<Scanner> {
+    let file = File::open(file_name)?;
+
+    let buf_reader = BufReader::new(file);
+
+    let scanner: Scanner = serde_json::from_reader(buf_reader).unwrap();
+    Ok(scanner)
 }
 
 #[cfg(test)]
