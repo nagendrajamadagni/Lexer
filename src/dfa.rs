@@ -11,8 +11,41 @@ use std::collections::hash_map::Values;
 use std::collections::VecDeque;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
+
+/// A struct which is a bitvec and its hash stored together to ease fetching the hash of the bitvec
+/// quickly instead of calculating it each time.
+
+#[derive(Clone)]
+struct HashedBitVec {
+    bv: BitVec<u8>,
+    hash: u64,
+}
+
+impl HashedBitVec {
+    fn new(bv: BitVec<u8>) -> Self {
+        let mut hasher = DefaultHasher::new();
+        bv.hash(&mut hasher);
+        let hash = hasher.finish();
+        Self { bv, hash }
+    }
+}
+
+impl Hash for HashedBitVec {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash);
+    }
+}
+
+impl PartialEq for HashedBitVec {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash && self.bv == other.bv
+    }
+}
+
+impl Eq for HashedBitVec {}
 
 #[derive(Debug)]
 pub struct DFA {
@@ -252,7 +285,7 @@ impl DFA {
     }
 }
 
-fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
+fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> HashedBitVec {
     let num_states: usize = nfa.get_num_states();
 
     let mut epsilon_closure: BitVec<u8, Lsb0> = BitVec::repeat(false, num_states);
@@ -280,14 +313,14 @@ fn get_epsilon_closure(nfa: &NFA, nfa_states: BitVec<u8>) -> BitVec<u8> {
         epsilon_closure.set(state.get_id(), true); // Adding the state itself to the epsilon closure
     }
 
-    epsilon_closure
+    HashedBitVec::new(epsilon_closure)
 }
 
 // This function returns the set of states accessible via char c within the set q
 
-fn delta(nfa: &NFA, q: &BitVec<u8>, c: char) -> BitVec<u8> {
-    let mut result = BitVec::repeat(false, q.len());
-    let nodes: Vec<usize> = q.iter_ones().collect();
+fn delta(nfa: &NFA, q: &HashedBitVec, c: char) -> BitVec<u8> {
+    let mut result = BitVec::repeat(false, q.bv.len());
+    let nodes: Vec<usize> = q.bv.iter_ones().collect();
     for node in nodes {
         let nfa_state = nfa.get_state(node).unwrap();
         let transitions = nfa_state.get_transitions();
@@ -603,12 +636,12 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     q_list.insert(q0.clone(), di); // Add it to the mapping
     work_list.push_back(q0.clone()); // Add the first nfa states set to the work list
 
-    let has_common = (q0.clone() & nfa_accepts).any();
+    let has_common = (q0.clone().bv & nfa_accepts).any();
 
     if has_common {
         result.accept_states.set(di, true);
 
-        for state in q0.iter_ones() {
+        for state in q0.bv.iter_ones() {
             let category = nfa.get_state(state).unwrap().get_category();
             if !category.is_empty() {
                 result.set_accept_category(category);
@@ -640,12 +673,12 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
 
                 work_list.push_back(t.clone());
 
-                let has_common = (t.clone() & nfa_accepts).any();
+                let has_common = (t.clone().bv & nfa_accepts).any();
 
                 if has_common {
                     // check if di is as an acceptor state
                     result.accept_states.set(di, true);
-                    for state in t.iter_ones() {
+                    for state in t.bv.iter_ones() {
                         let category = nfa.get_state(state).unwrap().get_category();
                         if !category.is_empty() {
                             result.set_accept_category(category);
