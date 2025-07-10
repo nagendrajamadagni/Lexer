@@ -8,7 +8,7 @@ use lexviz::{
 fn main() -> Result<()> {
     color_eyre::install()?;
     let args = Command::new("lexviz")
-                        .version("1.1")
+                        .version("2.0")
                         .author("Nagendra Kumar Jamadagni")
                         .about("A sample lexer built from following Engineering a Compiler by Keith Cooper and Linda Torczan")
                         .arg(
