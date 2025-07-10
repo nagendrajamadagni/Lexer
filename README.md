@@ -14,7 +14,7 @@ To use this program simply clone the repo and run with the following command:
 <br>
 `cargo run --release (-f <input mst file>  OR  -r r1 c1 -r r2 c2...) -i <input source program file> [-o <output file path>] [-n] [-d] [-m]`
 
-The different options as follows:
+The different options are as follows:
 
 - --microsyntax-file [-f] : A file containing the microsyntax rule and the syntactic category it describes. The file is a simple ASCII text file where each line is an entry containing a regular expression and a syntactic category separated by "::". The order of the syntactic categories in the file specifies the priority in which detected tokens are matched into syntactic categories. An example microsyntax file is shown below.
 
