@@ -522,7 +522,7 @@ impl Scanner {
     /// to the outfile.
     pub fn scan(
         &self,
-        source_file: String,
+        source_file: &str,
         out_file: Option<String>,
         skip_whitespace: bool,
         skip_list: Option<Vec<String>>,

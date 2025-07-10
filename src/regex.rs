@@ -469,7 +469,7 @@ pub fn parse_microsyntax_list(
     Ok(syntax_tree_list)
 }
 /// Parse a file containing microsyntaxes and return the parse trees
-pub fn read_microsyntax_file(file_path: String) -> Result<Vec<(String, String)>, RegExError> {
+pub fn read_microsyntax_file(file_path: &str) -> Result<Vec<(String, String)>, RegExError> {
     let file_path = PathBuf::from(file_path);
 
     let file = File::open(file_path);

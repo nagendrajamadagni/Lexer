@@ -3,16 +3,9 @@ use lexviz::{
     visualize,
 };
 
-use std::path::Path;
-
 fn main() {
     let regex = "abc";
     let category = "ABC";
-
-    let root = env!("CARGO_MANIFEST_DIR");
-    let path = Path::new(root);
-
-    let src_file_path = path.join("examples/abc").to_str().unwrap().to_string();
 
     let regex_list: Vec<(String, String)> = vec![(regex.to_string(), category.to_string())];
 
@@ -26,7 +19,7 @@ fn main() {
 
     let scanner = construct_scanner(&minimal_dfa);
 
-    let token_list = scanner.scan(src_file_path, None, false, None).unwrap();
+    let token_list = scanner.scan("examples/abc", None, false, None).unwrap();
 
     for token in token_list {
         println!(

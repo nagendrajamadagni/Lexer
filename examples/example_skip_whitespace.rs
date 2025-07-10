@@ -2,16 +2,9 @@ use lexviz::{
     construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
 };
 
-use std::path::Path;
-
 fn main() {
     let regex = "abc";
     let category = "ABC";
-
-    let root = env!("CARGO_MANIFEST_DIR");
-    let path = Path::new(root);
-
-    let src_file_path = path.join("examples/abc_def").to_str().unwrap().to_string();
 
     let mut regex_list: Vec<(String, String)> = Vec::new();
 
@@ -31,7 +24,7 @@ fn main() {
 
     let scanner = construct_scanner(&minimal_dfa);
 
-    let token_list = scanner.scan(src_file_path, None, true, None).unwrap();
+    let token_list = scanner.scan("examples/abc_def", None, true, None).unwrap();
 
     for token in token_list {
         println!(

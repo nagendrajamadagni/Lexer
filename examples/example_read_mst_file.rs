@@ -3,16 +3,8 @@ use lexviz::{
     read_microsyntax_file,
 };
 
-use std::path::Path;
-
 fn main() {
-    let root = env!("CARGO_MANIFEST_DIR");
-    let path = Path::new(root);
-
-    let mst_file_path = path.join("examples/abc.mst").to_str().unwrap().to_string();
-    let src_file_path = path.join("examples/abc").to_str().unwrap().to_string();
-
-    let regex_list = read_microsyntax_file(mst_file_path).unwrap();
+    let regex_list = read_microsyntax_file("examples/abc.mst").unwrap();
 
     let syntax_tree = parse_microsyntax_list(regex_list).unwrap();
 
@@ -24,7 +16,7 @@ fn main() {
 
     let scanner = construct_scanner(&minimal_dfa);
 
-    let token_list = scanner.scan(src_file_path, None, false, None).unwrap();
+    let token_list = scanner.scan("examples/abc", None, false, None).unwrap();
 
     for token in token_list {
         println!(

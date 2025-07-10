@@ -12,7 +12,7 @@ mod integration_tests_helper {
     }
 
     pub fn get_scanner(mst_path: &str) -> Scanner {
-        let regex_list = read_microsyntax_file(mst_path.to_string());
+        let regex_list = read_microsyntax_file(mst_path);
 
         // assert that reading the file was successful
         assert!(regex_list.is_ok());
@@ -71,7 +71,7 @@ mod integration_tests {
 
         // assert reading file was successful
 
-        let src_file_path = "test_data/valid.snek".to_string();
+        let src_file_path = "test_data/valid.snek";
         let token_list = scanner.scan(src_file_path, None, true, None);
 
         // assert that scanning succeeded
@@ -81,7 +81,7 @@ mod integration_tests {
 
         assert_eq!(token_list, expected_list);
 
-        let src_file_path = "test_data/invalid.snek".to_string();
+        let src_file_path = "test_data/invalid.snek";
         let token_list = scanner.scan(src_file_path, None, true, None);
         assert!(token_list.is_err());
 
@@ -99,7 +99,7 @@ mod integration_tests {
     fn test_comments() {
         let scanner = get_scanner("test_data/comments.mst");
 
-        let src_file_path = "test_data/comments.snek".to_string();
+        let src_file_path = "test_data/comments.snek";
 
         let skip_list: Vec<String> = vec!["COMMENT".to_string()];
 
@@ -130,7 +130,7 @@ mod integration_tests {
     fn test_empty() {
         let scanner = get_scanner("test_data/empty.mst");
 
-        let src_file_path = "test_data/empty.snek".to_string();
+        let src_file_path = "test_data/empty.snek";
 
         let token_list = scanner.scan(src_file_path, None, true, None);
         assert!(token_list.is_ok(),);
@@ -146,7 +146,7 @@ mod integration_tests {
     fn test_atleast_atmost() {
         let scanner = get_scanner("test_data/atleast_atmost.mst");
 
-        let src_file_path = "test_data/atleast_atmost.snek".to_string();
+        let src_file_path = "test_data/atleast_atmost.snek";
 
         let skip_list = vec!["NEWLINE".to_string()];
 
@@ -169,7 +169,7 @@ mod integration_tests {
     fn test_range() {
         let scanner = get_scanner("test_data/range.mst");
 
-        let src_file_path = "test_data/range.snek".to_string();
+        let src_file_path = "test_data/range.snek";
 
         let skip_list = vec!["NEWLINE".to_string()];
 
@@ -192,7 +192,7 @@ mod integration_tests {
     fn test_range_invalid() {
         let scanner = get_scanner("test_data/range_invalid.mst");
 
-        let src_file_path = "test_data/range_invalid.snek".to_string();
+        let src_file_path = "test_data/range_invalid.snek";
 
         let skip_list = vec!["NEWLINE".to_string()];
 
@@ -210,7 +210,7 @@ mod integration_tests {
     fn test_dot_operator() {
         let scanner = get_scanner("test_data/everything.mst");
 
-        let src_file_path = "test_data/everything.snek".to_string();
+        let src_file_path = "test_data/everything.snek";
 
         let token_list = scanner.scan(src_file_path, None, true, None);
 
@@ -241,7 +241,7 @@ mod integration_tests {
 
         let scanner = scanner.unwrap();
 
-        let src_file_path = "test_data/everything.snek".to_string();
+        let src_file_path = "test_data/everything.snek";
 
         let token_list = scanner.scan(src_file_path, None, true, None);
 

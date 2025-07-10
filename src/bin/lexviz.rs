@@ -1,16 +1,14 @@
 use clap::{Arg, Command};
 use color_eyre::eyre::{Report, Result};
 use lexviz::{
-    construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, parse_microsyntax_list,
-    read_microsyntax_file,
-    scanner::{load_scanner, Scanner},
-    visualize, LexerError,
+    construct_dfa, construct_minimal_dfa, construct_nfa, construct_scanner, load_scanner,
+    parse_microsyntax_list, read_microsyntax_file, scanner::Scanner, visualize, LexerError,
 };
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     let args = Command::new("lexviz")
-                        .version("1.0")
+                        .version("1.1")
                         .author("Nagendra Kumar Jamadagni")
                         .about("A sample lexer built from following Engineering a Compiler by Keith Cooper and Linda Torczan")
                         .arg(
@@ -114,7 +112,7 @@ fn main() -> Result<()> {
     let mut regex_list: Vec<(String, String)> = Vec::new();
 
     if let Some(mst_file_path) = args.get_one::<String>("microsyntax-file") {
-        let rlist = read_microsyntax_file(mst_file_path.to_string())?;
+        let rlist = read_microsyntax_file(mst_file_path)?;
         regex_list = rlist;
     } else if let Some(values) = args.get_occurrences::<String>("microsyntax") {
         for value_group in values {
@@ -132,7 +130,7 @@ fn main() -> Result<()> {
     }
 
     let src_file_path = match args.get_one::<String>("input") {
-        Some(file_path) => file_path.to_string(),
+        Some(file_path) => file_path,
         None => {
             let err = Report::new(LexerError::InputMissingError);
             return Err(err);
@@ -176,17 +174,13 @@ fn main() -> Result<()> {
         }
     };
 
-    let scanner_file_path = args
-        .get_one::<String>("save-scanner")
-        .map(|file_path| file_path.to_string());
+    let scanner_file_path = args.get_one::<String>("save-scanner");
 
-    let load_file_path = args
-        .get_one::<String>("load-scanner")
-        .map(|file_path| file_path.to_string());
+    let load_file_path = args.get_one::<String>("load-scanner");
 
     let scanner: Scanner = if load_file_path.is_some() && visualize_opt == "none" {
         let file_path = load_file_path.unwrap();
-        load_scanner(&file_path).unwrap()
+        load_scanner(file_path).unwrap()
     } else {
         let syntax_tree_list = parse_microsyntax_list(regex_list).unwrap();
 
@@ -206,9 +200,8 @@ fn main() -> Result<()> {
         construct_scanner(&minimal_dfa)
     };
 
-    if scanner_file_path.is_some() {
-        let file_path = scanner_file_path.unwrap();
-        scanner.save_scanner(&file_path).unwrap();
+    if let Some(file_path) = scanner_file_path {
+        scanner.save_scanner(file_path)?;
     }
 
     let token_list = scanner
