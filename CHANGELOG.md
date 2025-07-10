@@ -5,7 +5,7 @@ This documents all notable changes made to the repository
 ## v2.0.0 - July 10th, 2025
 
 ### Fixed
-- File Paths are now strs instead of String, this is a breaking change as APIs have changed
+- File Paths are now strs instead of String
 
 ## v1.1.0 - July 10th, 2025
 
