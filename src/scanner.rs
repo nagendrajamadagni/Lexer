@@ -217,10 +217,10 @@ where
 
     for (key, value) in classifier_table {
         let key_str = match key {
-            Some(c) => c.to_string(),
-            None => "null".to_string(),
+            Some(c) => &c.to_string(),
+            None => "null",
         };
-        ser_map.serialize_entry(&key_str, value)?;
+        ser_map.serialize_entry(key_str, value)?;
     }
     ser_map.end()
 }

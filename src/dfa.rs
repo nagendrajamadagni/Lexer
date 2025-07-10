@@ -395,15 +395,13 @@ fn get_lookup_table(dfa: &DFA) -> LookupTable {
                                                    // acceptors and there are no non acceptor
                                                    // states
 
-    let mut category_set_id: HashMap<String, usize> = HashMap::new(); // Mapping of category of accept state and set id
+    let mut category_set_id: HashMap<&String, usize> = HashMap::new(); // Mapping of category of accept state and set id
 
     for accept_state in states.iter_ones() {
         let category = dfa.get_state(accept_state).get_category();
         let offset_map_len = set_id + category_set_id.len();
 
-        let insert_id = category_set_id
-            .entry(category.to_string())
-            .or_insert(offset_map_len);
+        let insert_id = category_set_id.entry(category).or_insert(offset_map_len);
 
         lookup_table.insert_state_in_set(accept_state, *insert_id);
     }
@@ -608,8 +606,8 @@ pub fn construct_minimal_dfa(dfa: &DFA, save_minimal_dfa: bool) -> DFA {
     result.regex = regex.to_string();
 
     if save_minimal_dfa {
-        let filename = "constructed_minimal_dfa".to_string();
-        result.show_fa(&filename);
+        let filename = "constructed_minimal_dfa";
+        result.show_fa(filename);
     }
 
     result // We need to always reorder now as visualization is possible
@@ -698,8 +696,8 @@ pub fn construct_dfa(nfa: &NFA, save_dfa: bool) -> DFA {
     let regex = nfa.get_regex();
     result.regex = regex.to_string();
     if save_dfa {
-        let filename = "constructed_dfa".to_string();
-        result.show_fa(&filename);
+        let filename = "constructed_dfa";
+        result.show_fa(filename);
     }
 
     result

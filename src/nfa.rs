@@ -647,14 +647,14 @@ pub fn construct_nfa(
     let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
 
     let mut result = parse_regex_tree(syntax_tree)?;
-    result.regex = regex.to_string();
+    result.regex = regex;
 
     result.set_accept_category(category).unwrap();
 
     while !syntax_tree_list.is_empty() {
         let (regex, syntax_tree, category) = syntax_tree_list.pop_front().unwrap();
         let mut nfa = parse_regex_tree(syntax_tree)?;
-        nfa.regex = regex.to_string();
+        nfa.regex = regex.clone();
         nfa.set_accept_category(category).unwrap();
         let old_regex = result.regex.clone();
         result = NFA::alternation(result, nfa);
@@ -662,8 +662,8 @@ pub fn construct_nfa(
         result.regex = new_regex;
     }
     if save_nfa {
-        let filename = "constructed_nfa".to_string();
-        result.show_fa(&filename);
+        let filename = "constructed_nfa";
+        result.show_fa(filename);
     }
 
     Ok(result)
