@@ -25,7 +25,7 @@ pub mod visualizer;
 pub use dfa::{construct_dfa, construct_minimal_dfa};
 pub use nfa::construct_nfa;
 pub use regex::{parse_microsyntax_list, read_microsyntax_file};
-pub use scanner::construct_scanner;
+pub use scanner::{construct_scanner, load_scanner};
 pub use visualizer::visualize;
 
 // List of all possible Lexer Error Codes
