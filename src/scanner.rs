@@ -579,7 +579,9 @@ impl Scanner {
 
     /// This function saves the internal scanner configuration in a JSON file whose path is
     /// provided. The saved configuration can be imported to construct another scanner later
-    /// without having to go through the NFA->DFA->Scanner process which can be time consuming.
+    /// without having to go through the NFA->DFA->Scanner process which can be time consuming. Use
+    /// the laod_scanner function to load a previously saved scanner configuration to construct a
+    /// scanner.
     pub fn save_scanner(&self, path: &str) -> Result<(), ScannerError> {
         let json_string = serde_json::to_string_pretty(self).unwrap();
 
@@ -611,7 +613,8 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
     scanner
 }
 
-/// Load a previously saved scanner configuration to construct a maximal munch scanner.
+/// Load a previously saved scanner configuration to construct a maximal munch scanner. Use
+/// function save_scanner in Scanner struct to save the scanner's configuration to a file.
 pub fn load_scanner(file_name: &str) -> Result<Scanner, ScannerError> {
     let file = File::open(file_name);
 
