@@ -577,10 +577,13 @@ impl Scanner {
         println!("{:?}", self.classifier_table);
     }
 
-    pub fn save_scanner(&self, file_name: &str) -> Result<(), ScannerError> {
+    /// This function saves the internal scanner configuration in a JSON file whose path is
+    /// provided. The saved configuration can be imported to construct another scanner later
+    /// without having to go through the NFA->DFA->Scanner process which can be time consuming.
+    pub fn save_scanner(&self, path: &str) -> Result<(), ScannerError> {
         let json_string = serde_json::to_string_pretty(self).unwrap();
 
-        let file = File::create(file_name);
+        let file = File::create(path);
 
         let mut file = match file {
             Ok(file) => file,
@@ -608,7 +611,7 @@ pub fn construct_scanner(dfa: &DFA) -> Scanner {
     scanner
 }
 
-/// Load a scanner from a saved json file
+/// Load a previously saved scanner configuration to construct a maximal munch scanner.
 pub fn load_scanner(file_name: &str) -> Result<Scanner, ScannerError> {
     let file = File::open(file_name);
 
