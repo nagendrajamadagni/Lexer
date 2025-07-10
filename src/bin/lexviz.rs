@@ -137,7 +137,9 @@ fn main() -> Result<()> {
         }
     };
 
-    let out_file_path = args.get_one::<String>("output").cloned();
+    let out_file_path = args.get_one::<String>("output");
+
+    let out_file_path = out_file_path.map(|s| s.as_str());
 
     let mut skip_list: Vec<String> = Vec::new();
 

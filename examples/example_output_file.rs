@@ -18,10 +18,8 @@ fn main() {
 
     let scanner = construct_scanner(&minimal_dfa);
 
-    let output_file = "abc_output.lex".to_string();
-
     let token_list = scanner
-        .scan("examples/abc", Some(output_file), false, None)
+        .scan("examples/abc", Some("abc_output.lex"), false, None)
         .unwrap();
 
     for token in token_list {

@@ -523,13 +523,11 @@ impl Scanner {
     pub fn scan(
         &self,
         source_file: &str,
-        out_file: Option<String>,
+        out_file: Option<&str>,
         skip_whitespace: bool,
         skip_list: Option<Vec<String>>,
     ) -> Result<Vec<Token>> {
         let source_file = PathBuf::from(source_file);
-
-        let write_to_file = out_file.is_some();
 
         let mut token_list: Vec<Token> = Vec::new();
 
@@ -538,8 +536,8 @@ impl Scanner {
         let mut skip_set = HashSet::new();
         skip_set.insert("SKIP".to_string());
 
-        if skip_list.is_some() {
-            for elem in skip_list.unwrap() {
+        if let Some(skip_list) = skip_list {
+            for elem in skip_list {
                 skip_set.insert(elem);
             }
         }
@@ -559,8 +557,8 @@ impl Scanner {
 
             token_list.push(Token::new(next_word.0, next_word.1));
         }
-        if write_to_file {
-            let mut out_file = File::create(out_file.unwrap()).unwrap();
+        if let Some(out_file) = out_file {
+            let mut out_file = File::create(out_file).unwrap();
 
             for token in token_list.iter() {
                 let output_line = format!("({}, {})", token.token, token.category);
